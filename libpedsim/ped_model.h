@@ -22,7 +22,7 @@ namespace Ped{
 
 	// The implementation modes for Assignment 1 + 2:
 	// chooses which implementation to use for tick()
-	enum IMPLEMENTATION { CUDA, VECTOR, OMP, PTHREAD, SEQ };
+	enum IMPLEMENTATION { CUDA, VECTOR, OMP, PTHREAD, SEQ ,THREADS};
 
 	class Model
 	{
@@ -33,6 +33,16 @@ namespace Ped{
 		
 		// Coordinates a time step in the scenario: move all agents by one step (if applicable).
 		void tick();
+
+		// tick for sequential implementation
+		void sequential_tick();
+
+		// tick for openmp implementation
+		void openmp_tick1();
+		void openmp_tick2();
+
+		// tick for c++ thread implementation
+		void threads_tick();
 
 		// Returns the agents of this scenario
 		const std::vector<Tagent*>& getAgents() const { return agents; };
@@ -47,6 +57,8 @@ namespace Ped{
 		// Returns the heatmap visualizing the density of agents
 		int const * const * getHeatmap() const { return blurred_heatmap; };
 		int getHeatmapSize() const;
+
+		static int numberOfThreads;
 
 	private:
 
