@@ -7,7 +7,6 @@
 //
 #include "ped_model.h"
 #include "ped_waypoint.h"
-#include "ped_model.h"
 #include <iostream>
 #include <stack>
 #include <algorithm>
@@ -25,7 +24,7 @@
 
 int Ped::Model::numberOfThreads = omp_get_num_threads(); // by default use the number of threads available unless specified otherwise
 
-void Ped::Model::setup(std::vector<Ped::Tagent *> agentsInScenario, std::vector<Twaypoint *> destinationsInScenario, IMPLEMENTATION implementation)
+void Ped::Model::setup(std::vector<Ped::Tagent *> agentsInScenario, std::vector<Twaypoint *> destinationsInScenario, Ped::AgentSoA *AgentSoAScenario, IMPLEMENTATION implementation)
 {
 #ifndef NOCUDA
 	// Convenience test: does CUDA work on this machine?
@@ -40,6 +39,7 @@ void Ped::Model::setup(std::vector<Ped::Tagent *> agentsInScenario, std::vector<
 	// Set up destinations
 	destinations = std::vector<Ped::Twaypoint *>(destinationsInScenario.begin(), destinationsInScenario.end());
 
+	agentSoA = AgentSoAScenario;
 	// Sets the chosen implemenation. Standard in the given code is SEQ
 	this->implementation = implementation;
 
@@ -172,126 +172,63 @@ void Ped::Model::threads_tick()
 	}
 }
 
-static inline __m128 my_round_ps(__m128 x)
+static inline __m128 round_ps(__m128 x)
 {
-	// Create a constant for +0.5.
 	__m128 half = _mm_set1_ps(0.5);
-	// Create a constant for -0.0; when ANDed with x, this extracts the sign.
 	__m128 sign_mask = _mm_set1_ps(-0.0);
-	// Use the sign of x to create a bias: for positive numbers, bias = +0.5;
-	// for negative numbers, bias = -0.5.
 	__m128 bias = _mm_or_ps(half, _mm_and_ps(x, sign_mask));
-	// Add the bias to x.
 	__m128 biased = _mm_add_ps(x, bias);
-	// Truncate biased toward zero.
 	__m128i i = _mm_cvttps_epi32(biased);
-	// Convert the truncated integers back to double.
 	return _mm_cvtepi32_ps(i);
 }
 
 void Ped::Model::vector_tick()
 {
-	size_t n = agents.size();
+	AgentSoA *agentData = agentSoA;
+	size_t n = agentData->numAgents;
 
-	// First, update each agent's destination pointer.
-	// (This is done in scalar code because getNextDestination() may update internal state.)
-	for (size_t i = 0; i < n; ++i)
+	// Vectorized computation of desired positions
+	// Process four agents per iteration:
+	for (size_t i = 0; i < n; i += 4)
 	{
-		agents[i]->destination = agents[i]->getNextDestination();
+		__m128 x_vec = _mm_load_ps(&agentData->x[i]);
+		__m128 y_vec = _mm_load_ps(&agentData->y[i]);
+
+		__m128 destX_vec = _mm_load_ps(&agentData->destX[i]);
+		__m128 destY_vec = _mm_load_ps(&agentData->destY[i]);
+
+		__m128 diffX = _mm_sub_ps(destX_vec, x_vec);
+		__m128 diffY = _mm_sub_ps(destY_vec, y_vec);
+
+		__m128 diffX_sq = _mm_mul_ps(diffX, diffX);
+		__m128 diffY_sq = _mm_mul_ps(diffY, diffY);
+
+		__m128 sum = _mm_add_ps(diffX_sq, diffY_sq);
+
+		__m128 len = _mm_sqrt_ps(sum);
+
+		__m128 ratioX = _mm_div_ps(diffX, len);
+		__m128 ratioY = _mm_div_ps(diffY, len);
+
+		__m128 newX = _mm_add_ps(x_vec, ratioX);
+		__m128 newY = _mm_add_ps(y_vec, ratioY);
+
+		__m128 roundedX = round_ps(newX);
+		__m128 roundedY = round_ps(newY);
+
+		_mm_store_ps(&agentData->desiredX[i], roundedX);
+		_mm_store_ps(&agentData->desiredY[i], roundedY);
 	}
 
-	size_t i = 0;
-	// Process groups of 4 agents at a time.
-	for (; i + 3 < n; i += 4)
+	for (size_t i = 0; i < n; i += 4)
 	{
-		Ped::Tagent *a0 = agents[i];
-		Ped::Tagent *a1 = agents[i + 1];
-		Ped::Tagent *a2 = agents[i + 2];
-		Ped::Tagent *a3 = agents[i + 3];
-
-		// Check that all 4 agents have a valid destination.
-		if (a0->destination != nullptr && a1->destination != nullptr &&
-			a2->destination != nullptr && a3->destination != nullptr)
-		{
-			// Load current positions into __m128 registers.
-			// _mm_set_ps expects values in order: [e3, e2, e1, e0]
-			__m128 x_vec = _mm_set_ps((float)a3->x, (float)a2->x, (float)a1->x, (float)a0->x);
-			__m128 y_vec = _mm_set_ps((float)a3->y, (float)a2->y, (float)a1->y, (float)a0->y);
-
-			// Load destination coordinates.
-			// Cast destination values from double to float.
-			__m128 destX_vec = _mm_set_ps((float)a3->destination->getx(),
-										  (float)a2->destination->getx(),
-										  (float)a1->destination->getx(),
-										  (float)a0->destination->getx());
-			__m128 destY_vec = _mm_set_ps((float)a3->destination->gety(),
-										  (float)a2->destination->gety(),
-										  (float)a1->destination->gety(),
-										  (float)a0->destination->gety());
-
-			// Compute differences: diff = destination - current position.
-			__m128 diffX = _mm_sub_ps(destX_vec, x_vec);
-			__m128 diffY = _mm_sub_ps(destY_vec, y_vec);
-
-			// Compute squared differences.
-			__m128 diffX_sq = _mm_mul_ps(diffX, diffX);
-			__m128 diffY_sq = _mm_mul_ps(diffY, diffY);
-			__m128 sum = _mm_add_ps(diffX_sq, diffY_sq);
-
-			// Compute the Euclidean distance (length).
-			__m128 len = _mm_sqrt_ps(sum);
-
-			// Compute ratios: diff / len.
-			__m128 ratioX = _mm_div_ps(diffX, len);
-			__m128 ratioY = _mm_div_ps(diffY, len);
-
-			// Compute new positions: newPos = current position + ratio.
-			__m128 newX = _mm_add_ps(x_vec, ratioX);
-			__m128 newY = _mm_add_ps(y_vec, ratioY);
-
-			// Round the computed positions using our custom SSE rounding function.
-			__m128 roundedX = my_round_ps(newX);
-			__m128 roundedY = my_round_ps(newY);
-
-			// Store the results in temporary arrays.
-			float resX[4], resY[4];
-			_mm_storeu_ps(resX, roundedX);
-			_mm_storeu_ps(resY, roundedY);
-
-			// Update desired positions.
-			// Note: _mm_set_ps packs values so that resX[0] corresponds to a0, etc.
-			a0->desiredPositionX = (int)resX[0];
-			a0->desiredPositionY = (int)resY[0];
-			a1->desiredPositionX = (int)resX[1];
-			a1->desiredPositionY = (int)resY[1];
-			a2->desiredPositionX = (int)resX[2];
-			a2->desiredPositionY = (int)resY[2];
-			a3->desiredPositionX = (int)resX[3];
-			a3->desiredPositionY = (int)resY[3];
-		}
-		else
-		{
-			// Fallback: if any agent does not have a destination, process them individually.
-			a0->computeNextDesiredPosition();
-			a1->computeNextDesiredPosition();
-			a2->computeNextDesiredPosition();
-			a3->computeNextDesiredPosition();
-		}
-	}
-
-	// Process any remaining agents that did not form a complete batch of 4.
-	for (; i < n; i++)
-	{
-		agents[i]->computeNextDesiredPosition();
-	}
-
-	// Finally, update each agent's actual position from its desired position.
-	for (size_t i = 0; i < n; i++)
-	{
-		agents[i]->setX(agents[i]->getDesiredX());
-		agents[i]->setY(agents[i]->getDesiredY());
+		__m128 newPosX = _mm_load_ps(&agentData->desiredX[i]);
+		__m128 newPosY = _mm_load_ps(&agentData->desiredY[i]);
+		_mm_store_ps(&agentData->x[i], newPosX);
+		_mm_store_ps(&agentData->y[i], newPosY);
 	}
 }
+
 ////////////
 /// Everything below here relevant for Assignment 3.
 /// Don't use this for Assignment 1!

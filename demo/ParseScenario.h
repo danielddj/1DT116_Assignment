@@ -29,24 +29,28 @@ public:
 	~ParseScenario() {}
 
 	// returns the collection of agents defined by this scenario
-	vector<Ped::Tagent*> getAgents() const;
+	vector<Ped::Tagent *> getAgents() const;
+
+	Ped::AgentSoA *getAgentSoA() const;
 
 	// contains all defined waypoints
-	vector<Ped::Twaypoint*> getWaypoints();
+	vector<Ped::Twaypoint *> getWaypoints();
 
 private:
 	XMLDocument doc;
 
 	// final collection of all created agents
-	vector<Ped::Tagent*> agents;
+	vector<Ped::Tagent *> agents;
 
 	// temporary collection of agents used to
 	// keep track of all agents that are generated
 	// within the current opened agents xml tag
-	vector<Ped::Tagent*> tempAgents;
+	vector<Ped::Tagent *> tempAgents;
+	Ped::AgentSoA *globalAgentSoA;
 
 	// contains all defined waypoints
-	map<string, Ped::Twaypoint*> waypoints;
+	map<string, Ped::Twaypoint *>
+		waypoints;
 };
 
 #endif

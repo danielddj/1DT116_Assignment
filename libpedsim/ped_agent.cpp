@@ -1,74 +1,69 @@
-//
-// pedsim - A microscopic pedestrian simulation system.
-// Copyright (c) 2003 - 2014 by Christian Gloor
-//
-//
-// Adapted for Low Level Parallel Programming 2017
-//
 #include "ped_agent.h"
-#include "ped_waypoint.h"
-#include <math.h>
-
+#include <cmath>
 #include <stdlib.h>
 
-Ped::Tagent::Tagent(int posX, int posY) {
-	Ped::Tagent::init(posX, posY);
-}
+namespace Ped
+{
 
-Ped::Tagent::Tagent(double posX, double posY) {
-	Ped::Tagent::init((int)round(posX), (int)round(posY));
-}
+	Tagent::Tagent(size_t idx, AgentSoA *soaPtr)
+		: index(idx), soa(soaPtr) {}
 
-void Ped::Tagent::init(int posX, int posY) {
-	x = posX;
-	y = posY;
-	destination = NULL;
-	lastDestination = NULL;
-}
+	// Compute the next desired position for this agent.
+	void Tagent::computeNextDesiredPosition()
+	{
+		Twaypoint *dest = getNextDestination();
+		if (dest == nullptr)
+		{
+			return; // No destination—nothing to do.
+		}
 
-void Ped::Tagent::computeNextDesiredPosition() {
-	destination = getNextDestination();
-	if (destination == NULL) {
-		// no destination, no need to
-		// compute where to move to
-		return;
+		float currX = soa->x[index];
+		float currY = soa->y[index];
+		float diffX = static_cast<float>(dest->getx()) - currX;
+		float diffY = static_cast<float>(dest->gety()) - currY;
+		float len = sqrtf(diffX * diffX + diffY * diffY);
+
+		soa->desiredX[index] = roundf(currX + diffX / len);
+		soa->desiredY[index] = roundf(currY + diffY / len);
 	}
 
-	double diffX = destination->getx() - x;
-	double diffY = destination->gety() - y;
-	double len = sqrt(diffX * diffX + diffY * diffY);
-	desiredPositionX = (int)round(x + diffX / len);
-	desiredPositionY = (int)round(y + diffY / len);
-}
-
-void Ped::Tagent::addWaypoint(Twaypoint* wp) {
-	waypoints.push_back(wp);
-}
-
-Ped::Twaypoint* Ped::Tagent::getNextDestination() {
-	Ped::Twaypoint* nextDestination = NULL;
-	bool agentReachedDestination = false;
-
-	if (destination != NULL) {
-		// compute if agent reached its current destination
-		double diffX = destination->getx() - x;
-		double diffY = destination->gety() - y;
-		double length = sqrt(diffX * diffX + diffY * diffY);
-		agentReachedDestination = length < destination->getr();
+	// Add a waypoint for this agent.
+	void Tagent::addWaypoint(Twaypoint *wp)
+	{
+		soa->waypoints[index].push_back(wp);
 	}
 
-	if ((agentReachedDestination || destination == NULL) && !waypoints.empty()) {
-		// Case 1: agent has reached destination (or has no current destination);
-		// get next destination if available
-		waypoints.push_back(destination);
-		nextDestination = waypoints.front();
-		waypoints.pop_front();
-	}
-	else {
-		// Case 2: agent has not yet reached destination, continue to move towards
-		// current destination
-		nextDestination = destination;
+	// Retrieve the next destination.
+	Twaypoint *Tagent::getNextDestination()
+	{
+		Twaypoint *currDest = soa->destination[index];
+		bool agentReachedDestination = false;
+
+		if (currDest != nullptr)
+		{
+			float currX = soa->x[index];
+			float currY = soa->y[index];
+			float diffX = static_cast<float>(currDest->getx()) - currX;
+			float diffY = static_cast<float>(currDest->gety()) - currY;
+			float len = sqrtf(diffX * diffX + diffY * diffY);
+			agentReachedDestination = (len < currDest->getr());
+		}
+
+		Twaypoint *nextDest = nullptr;
+		if ((agentReachedDestination || currDest == nullptr) && !soa->waypoints[index].empty())
+		{
+			if (currDest != nullptr)
+				soa->waypoints[index].push_back(currDest);
+			nextDest = soa->waypoints[index].front();
+			soa->waypoints[index].pop_front();
+		}
+		else
+		{
+			nextDest = currDest;
+		}
+
+		soa->destination[index] = nextDest;
+		return nextDest;
 	}
 
-	return nextDestination;
 }

@@ -1,80 +1,79 @@
-//
-// pedsim - A microscopic pedestrian simulation system.
-// Copyright (c) 2003 - 2014 by Christian Gloor
-//
-// Adapted for Low Level Parallel Programming 2017
-//
-// TAgent represents an agent in the scenario. Each
-// agent has a position (x,y) and a number of destinations
-// it wants to visit (waypoints). The desired next position
-// represents the position it would like to visit next as it
-// will bring it closer to its destination.
-// Note: the agent will not move by itself, but the movement
-// is handled in ped_model.cpp.
-//
+#pragma once
 
-#ifndef _ped_agent_h_
-#define _ped_agent_h_ 1
-
-#include <vector>
+#include "ped_waypoint.h"
 #include <deque>
-
-using namespace std;
+#include <vector>
+#include <xmmintrin.h>
 
 namespace Ped
 {
-	class Twaypoint;
 
+	struct AgentSoA
+	{
+		size_t numAgents;
+		float *x;
+		float *y;
+		float *desiredX;
+		float *desiredY;
+		float *destX;
+		float *destY;
+		Twaypoint **destination;
+		Twaypoint **lastDestination;
+		std::vector<std::deque<Twaypoint *>> waypoints;
+
+		AgentSoA(size_t numAgents) : numAgents(numAgents), waypoints(numAgents)
+		{
+			x = (float *)_mm_malloc(numAgents * sizeof(float), 16);
+			y = (float *)_mm_malloc(numAgents * sizeof(float), 16);
+			desiredX = (float *)_mm_malloc(numAgents * sizeof(float), 16);
+			desiredY = (float *)_mm_malloc(numAgents * sizeof(float), 16);
+			destX = (float *)_mm_malloc(numAgents * sizeof(float), 16);
+			destY = (float *)_mm_malloc(numAgents * sizeof(float), 16);
+			destination = (Twaypoint **)_mm_malloc(numAgents * sizeof(Twaypoint *), 16);
+			lastDestination = (Twaypoint **)_mm_malloc(numAgents * sizeof(Twaypoint *), 16);
+
+			for (size_t i = 0; i < numAgents; i++)
+			{
+				destination[i] = nullptr;
+				lastDestination[i] = nullptr;
+			}
+		}
+
+		~AgentSoA()
+		{
+			_mm_free(x);
+			_mm_free(y);
+			_mm_free(desiredX);
+			_mm_free(desiredY);
+			_mm_free(destX);
+			_mm_free(destY);
+			_mm_free(destination);
+			_mm_free(lastDestination);
+		}
+	};
 	class Tagent
 	{
 	public:
-		Tagent(int posX, int posY);
-		Tagent(double posX, double posY);
+		size_t index;
+		AgentSoA *soa;
 
-		// Returns the coordinates of the desired position
-		int getDesiredX() const { return desiredPositionX; }
-		int getDesiredY() const { return desiredPositionY; }
+		Tagent(size_t idx, AgentSoA *soaPtr);
 
-		// Sets the agent's position
-		void setX(int newX) { x = newX; }
-		void setY(int newY) { y = newY; }
-
-		// Update the position according to get closer
-		// to the current destination
 		void computeNextDesiredPosition();
-
-		// Position of agent defined by x and y
-		int getX() const { return x; };
-		int getY() const { return y; };
-
-		// Adds a new waypoint to reach for this agent
 		void addWaypoint(Twaypoint *wp);
-		Twaypoint *destination;
 		Twaypoint *getNextDestination();
 
-		// The agent's current position
-		int x;
-		int y;
-
-		// The agent's desired next position
-		int desiredPositionX;
-		int desiredPositionY;
-
-		// The current destination (may require several steps to reach)
-
-		// The last destination
-		Twaypoint *lastDestination;
-
-		// The queue of all destinations that this agent still has to visit
-		deque<Twaypoint *> waypoints;
-
-		// Internal init function
-		void init(int posX, int posY);
-
-	private:
-		// Returns the next destination to visit
-		Tagent() {};
+		// Inline accessors to mimic the old interface:
+		inline int getX() const { return static_cast<int>(soa->x[index]); }
+		inline int getY() const { return static_cast<int>(soa->y[index]); }
+		inline void setX(int newX) { soa->x[index] = static_cast<float>(newX); }
+		inline void setY(int newY) { soa->y[index] = static_cast<float>(newY); }
+		inline int getDesiredX() const { return static_cast<int>(soa->desiredX[index]); }
+		inline int getDesiredY() const { return static_cast<int>(soa->desiredY[index]); }
+		inline void setDesiredX(int val) { soa->desiredX[index] = static_cast<float>(val); }
+		inline void setDesiredY(int val) { soa->desiredY[index] = static_cast<float>(val); }
+		inline Twaypoint *getDestination() const { return soa->destination[index]; }
+		inline void setDestination(Twaypoint *dest) { soa->destination[index] = dest; }
 	};
-}
 
-#endif
+}

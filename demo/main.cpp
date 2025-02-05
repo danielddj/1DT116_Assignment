@@ -205,7 +205,7 @@ int main(int argc, char *argv[])
             {
                 Ped::Model model;
                 ParseScenario parser(scenefile);
-                model.setup(parser.getAgents(), parser.getWaypoints(), Ped::SEQ);
+                model.setup(parser.getAgents(), parser.getWaypoints(), parser.getAgentSoA(), Ped::SEQ);
                 Simulation *simulation = new TimingSimulation(model, max_steps);
 
                 // Simulation mode to use when profiling (without any GUI)
@@ -222,7 +222,7 @@ int main(int argc, char *argv[])
             {
                 Ped::Model model;
                 ParseScenario parser(scenefile);
-                model.setup(parser.getAgents(), parser.getWaypoints(), implementation_to_test);
+                model.setup(parser.getAgents(), parser.getWaypoints(), parser.getAgentSoA(), implementation_to_test);
                 Simulation *simulation = new TimingSimulation(model, max_steps);
                 // Simulation mode to use when profiling (without any GUI)
                 std::cout << "Running target version...\n";
@@ -240,7 +240,7 @@ int main(int argc, char *argv[])
         {
             Ped::Model model;
             ParseScenario parser(scenefile);
-            model.setup(parser.getAgents(), parser.getWaypoints(), implementation_to_test);
+            model.setup(parser.getAgents(), parser.getWaypoints(), parser.getAgentSoA(), implementation_to_test);
 
             Simulation *simulation = new ExportSimulation(model, max_steps, export_trace_file);
 
