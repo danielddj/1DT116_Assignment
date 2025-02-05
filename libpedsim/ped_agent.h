@@ -10,7 +10,7 @@
 // represents the position it would like to visit next as it
 // will bring it closer to its destination.
 // Note: the agent will not move by itself, but the movement
-// is handled in ped_model.cpp. 
+// is handled in ped_model.cpp.
 //
 
 #ifndef _ped_agent_h_
@@ -21,10 +21,12 @@
 
 using namespace std;
 
-namespace Ped {
+namespace Ped
+{
 	class Twaypoint;
 
-	class Tagent {
+	class Tagent
+	{
 	public:
 		Tagent(int posX, int posY);
 		Tagent(double posX, double posY);
@@ -46,10 +48,9 @@ namespace Ped {
 		int getY() const { return y; };
 
 		// Adds a new waypoint to reach for this agent
-		void addWaypoint(Twaypoint* wp);
-
-	private:
-		Tagent() {};
+		void addWaypoint(Twaypoint *wp);
+		Twaypoint *destination;
+		Twaypoint *getNextDestination();
 
 		// The agent's current position
 		int x;
@@ -60,19 +61,19 @@ namespace Ped {
 		int desiredPositionY;
 
 		// The current destination (may require several steps to reach)
-		Twaypoint* destination;
 
 		// The last destination
-		Twaypoint* lastDestination;
+		Twaypoint *lastDestination;
 
 		// The queue of all destinations that this agent still has to visit
-		deque<Twaypoint*> waypoints;
+		deque<Twaypoint *> waypoints;
 
-		// Internal init function 
+		// Internal init function
 		void init(int posX, int posY);
 
+	private:
 		// Returns the next destination to visit
-		Twaypoint* getNextDestination();
+		Tagent() {};
 	};
 }
 
