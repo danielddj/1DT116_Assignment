@@ -45,11 +45,6 @@ namespace Ped
 		// to the current destination
 		void computeNextDesiredPosition();
 
-		static void computeDesiredPositionsSIMD(const float *x, const float *y,
-												const float *destX, const float *destY,
-												float *outDesiredX, float *outDesiredY,
-												int numAgents);
-
 		static void computeDesiredPositionsSIMD2(const float *x, const float *y,
 												 const float *destX, const float *destY,
 												 float *outDesiredX, float *outDesiredY,
@@ -74,6 +69,8 @@ namespace Ped
 		int x;
 		int y;
 
+		
+
 		// The agent's desired next position
 		int desiredPositionX;
 		int desiredPositionY;
@@ -90,14 +87,28 @@ namespace Ped
 		// Internal init function
 		void init(int posX, int posY);
 
-		// Returns the next destination to visit
+	};
 
-		static void computeNextDestinationSIMD(const float *x, const float *y,
-											   const float *destX, const float *destY,
-											   const uint8_t *valid, // 1 if valid, 0 if not
-											   float *outDesiredX, float *outDesiredY,
-											   int numAgents);
+
+	struct TAgentSoA {
+		std::vector<int> x;
+		std::vector<int> y;
+
+		std::vector<int> desiredPositionX;
+		std::vector<int> desiredPositionY;
+
+		std::vector<Twaypoint *> destination;
+
+		std::vector<std::deque<Twaypoint *>> waypoints;
 	};
 }
+
+	struct WaypointSoA {
+		std::vector<int> x;
+		std::vector<int> y;
+		std::vector<int> r;
+		std::vector<int> id;
+		static int staticid;
+	};
 
 #endif

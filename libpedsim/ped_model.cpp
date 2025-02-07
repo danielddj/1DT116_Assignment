@@ -47,18 +47,34 @@ void Ped::Model::setup(std::vector<Ped::Tagent *> agentsInScenario, std::vector<
 	// Set up the SoA layout (relevant for Assignment 2)
 	if (implementation == VECTOR)
 	{
-		for (Ped::Tagent *agent : agents)
-		{
-			x.push_back(agent->getX());
-			y.push_back(agent->getY());
-			desiredPositionX.push_back(NAN);
-			desiredPositionY.push_back(NAN);
+		
+		int numberOfAgents = agents.size();
 
-			// Set up the destinations
-			destinationsX.push_back(NAN);
-			destinationsY.push_back(NAN);
-			destinationsR.push_back(NAN);
-			destinationsID.push_back(NAN);
+		desiredPositionX = FloatVectorAligned32(numberOfAgents);
+		desiredPositionY = FloatVectorAligned32(numberOfAgents);
+		x = FloatVectorAligned32(numberOfAgents);
+		y = FloatVectorAligned32(numberOfAgents);
+		destinationsX = FloatVectorAligned32(numberOfAgents);
+		destinationsY = FloatVectorAligned32(numberOfAgents);
+		destinationsR = FloatVectorAligned32(numberOfAgents);
+		destinationsID = IntVectorAligned32(numberOfAgents);
+
+		int largestQueue = -1;
+
+
+
+
+		for (int i = 0 ; i < agents.size(); i++)
+		{
+			x[i] = agents[i]->getX();
+			y[i] = agents[i]->getY();
+
+			desiredPositionX[i] = NAN;
+			desiredPositionY[i] = NAN;
+			destinationsX[i] = NAN;
+			destinationsY[i] = NAN;
+			destinationsR[i] = NAN;
+			destinationsID[i] = NAN;
 
 			// Set up the waypoints
 			std::deque<float> queueX;
@@ -66,12 +82,19 @@ void Ped::Model::setup(std::vector<Ped::Tagent *> agentsInScenario, std::vector<
 			std::deque<float> queueR;
 			std::deque<int> queueID;
 
-			for (Ped::Twaypoint *waypoint : agent->getWaypoints())
+
+
+			for (Ped::Twaypoint *waypoint : agents[i]->getWaypoints())
 			{
 				queueX.push_back(waypoint->getx());
 				queueY.push_back(waypoint->gety());
 				queueR.push_back(waypoint->getr());
 				queueID.push_back(waypoint->getid());
+			}
+
+			if (queueX.size() > largestQueue)
+			{
+				largestQueue = queueX.size();
 			}
 			waypointsX.push_back(queueX);
 			waypointsY.push_back(queueY);
@@ -80,6 +103,8 @@ void Ped::Model::setup(std::vector<Ped::Tagent *> agentsInScenario, std::vector<
 		}
 
 	}
+
+
 	// Set up heatmap (relevant for Assignment 4)
 	setupHeatmapSeq();
 }

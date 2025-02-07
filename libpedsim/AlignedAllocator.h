@@ -22,16 +22,13 @@ struct AlignedAllocator
 {
     using value_type = T;
 
-    // *** Add this block to support std::allocator_traits::rebind ***
     template <class U>
     struct rebind {
         using other = AlignedAllocator<U, Alignment>;
     };
-    // ***************************************************************
 
     AlignedAllocator() noexcept = default;
 
-    // Copy constructor for different type U:
     template <class U>
     AlignedAllocator(const AlignedAllocator<U, Alignment>&) noexcept {}
 
@@ -49,7 +46,6 @@ struct AlignedAllocator
     }
 };
 
-// Equality operators so std::vector can compare allocators.
 template <typename T, std::size_t A, typename U, std::size_t B>
 inline bool operator==(const AlignedAllocator<T,A>&, const AlignedAllocator<U,B>&)
 {
@@ -61,7 +57,6 @@ inline bool operator!=(const AlignedAllocator<T,A>&, const AlignedAllocator<U,B>
     return A != B;
 }
 
-// Optionally define aliases for convenience
 using FloatVectorAligned16 = std::vector<float, AlignedAllocator<float, 16>>;
 using IntVectorAligned16   = std::vector<int,   AlignedAllocator<int, 16>>;
 
