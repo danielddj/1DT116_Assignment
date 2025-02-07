@@ -7,15 +7,24 @@
 
 #include <stdlib.h>
 
-// initialize static variables
-int Ped::Twaypoint::staticid = 0;
-
 // Constructor: Sets some intial values. The agent has to pass within the given radius.
-Ped::Twaypoint::Twaypoint(double px, double py, double pr) : id(staticid++), x(px), y(py), r(pr) {};
+Ped::Twaypoint::Twaypoint(double px, double py, double pr, waypointSoA *soa) : soa(soa)
+{
+    id = soa->staticid;
+    soa->x[soa->staticid] = px;
+    soa->y[soa->staticid] = py;
+    soa->r[soa->staticid] = pr;
+    soa->staticid++;
+};
 
 // Constructor - sets the most basic parameters.
-Ped::Twaypoint::Twaypoint() : id(staticid++), x(0), y(0), r(1) {};
+Ped::Twaypoint::Twaypoint(waypointSoA *soa) : soa(soa)
+{
+    id = soa->staticid;
+    soa->x[soa->staticid] = 0;
+    soa->y[soa->staticid] = 0;
+    soa->r[soa->staticid] = 0;
+    soa->staticid++;
+};
 
 Ped::Twaypoint::~Twaypoint() {};
-
-

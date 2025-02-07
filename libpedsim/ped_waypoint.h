@@ -19,42 +19,59 @@
 #endif
 
 #include <cstddef>
+#include <nmmintrin.h>
 
 using namespace std;
 
-namespace Ped {
-	class LIBEXPORT Twaypoint {
+namespace Ped
+{
+	struct waypointSoA
+	{
+		int numberOfWaypoints;
+		float *x;
+		float *y;
+		float *r;
+		int staticid;
+
+		waypointSoA(int numWaypoints) : staticid(0)
+		{
+			numberOfWaypoints = numWaypoints;
+			x = (float *)_mm_malloc(numberOfWaypoints * sizeof(float), 16);
+			y = (float *)_mm_malloc(numberOfWaypoints * sizeof(float), 16);
+			r = (float *)_mm_malloc(numberOfWaypoints * sizeof(float), 16);
+		}
+
+		~waypointSoA()
+		{
+			_mm_free(x);
+			_mm_free(y);
+			_mm_free(r);
+		}
+	};
+
+	class LIBEXPORT Twaypoint
+	{
 	public:
-		Twaypoint();
-		Twaypoint(double x, double y, double r);
+		Twaypoint(waypointSoA *soa);
+		Twaypoint(double x, double y, double r, waypointSoA *soa);
 		virtual ~Twaypoint();
 
 		// Sets the coordinates and the radius of this waypoint
-		void setx(double px) { x = px; };
-		void sety(double py) { y = py; };
-		void setr(double pr) { r = pr; };
+		void setx(double px) { soa->x[id] = px; };
+		void sety(double py) { soa->y[id] = py; };
+		void setr(double pr) { soa->r[id] = pr; };
 
 		int getid() const { return id; };
-		double getx() const { return x; };
-		double gety() const { return y; };
-		double getr() const { return r; };
+		double getx() const { return soa->x[id]; };
+		double gety() const { return soa->y[id]; };
+		double getr() const { return soa->r[id]; };
 
 	protected:
 		// id incrementer, used for assigning unique ids
-		static int staticid;
+		waypointSoA *soa;
 
 		// waypoint id
 		int id;
-
-		// position of the waypoint
-		double x;
-		double y;
-
-		// radius defines the area of this waypoint, i.e. a circular
-		// area with the middle point in (x,y).
-		// Any point within this area is considered to be belonging
-		// to this destination.
-		double r;
 	};
 }
 

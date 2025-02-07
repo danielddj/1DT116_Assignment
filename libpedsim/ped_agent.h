@@ -3,11 +3,10 @@
 #include "ped_waypoint.h"
 #include <deque>
 #include <vector>
-#include <xmmintrin.h>
+#include <nmmintrin.h>
 
 namespace Ped
 {
-
 	struct AgentSoA
 	{
 		size_t numAgents;

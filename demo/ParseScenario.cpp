@@ -40,6 +40,13 @@ ParseScenario::ParseScenario(std::string filename, bool verbose)
 		return;
 	}
 
+	int totalWaypoints = 0;
+	for (XMLElement *waypoint = root->FirstChildElement("waypoint"); waypoint; waypoint = waypoint->NextSiblingElement("waypoint"))
+	{
+		totalWaypoints += 1;
+	}
+
+	Ped::waypointSoA *waypointData = new Ped::waypointSoA(totalWaypoints);
 	// Parse waypoints
 	if (verbose)
 		std::cout << "Waypoints:" << std::endl;
@@ -53,7 +60,7 @@ ParseScenario::ParseScenario(std::string filename, bool verbose)
 		if (verbose)
 			std::cout << "  ID: " << id << ", x: " << x << ", y: " << y << ", r: " << r << std::endl;
 
-		Ped::Twaypoint *w = new Ped::Twaypoint(x, y, r);
+		Ped::Twaypoint *w = new Ped::Twaypoint(x, y, r, waypointData);
 		waypoints[id] = w;
 	}
 
