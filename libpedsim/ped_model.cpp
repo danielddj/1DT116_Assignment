@@ -24,6 +24,8 @@
 
 int Ped::Model::numberOfThreads = omp_get_num_threads(); // by default use the number of threads available unless specified otherwise
 
+
+
 void Ped::Model::setup(std::vector<Ped::Tagent *> agentsInScenario, std::vector<Twaypoint *> destinationsInScenario, IMPLEMENTATION implementation)
 {
 #ifndef NOCUDA
@@ -42,6 +44,42 @@ void Ped::Model::setup(std::vector<Ped::Tagent *> agentsInScenario, std::vector<
 	// Sets the chosen implemenation. Standard in the given code is SEQ
 	this->implementation = implementation;
 
+	// Set up the SoA layout (relevant for Assignment 2)
+	if (implementation == VECTOR)
+	{
+		for (Ped::Tagent *agent : agents)
+		{
+			x.push_back(agent->getX());
+			y.push_back(agent->getY());
+			desiredPositionX.push_back(NAN);
+			desiredPositionY.push_back(NAN);
+
+			// Set up the destinations
+			destinationsX.push_back(NAN);
+			destinationsY.push_back(NAN);
+			destinationsR.push_back(NAN);
+			destinationsID.push_back(NAN);
+
+			// Set up the waypoints
+			std::deque<float> queueX;
+			std::deque<float> queueY;
+			std::deque<float> queueR;
+			std::deque<int> queueID;
+
+			for (Ped::Twaypoint *waypoint : agent->getWaypoints())
+			{
+				queueX.push_back(waypoint->getx());
+				queueY.push_back(waypoint->gety());
+				queueR.push_back(waypoint->getr());
+				queueID.push_back(waypoint->getid());
+			}
+			waypointsX.push_back(queueX);
+			waypointsY.push_back(queueY);
+			waypointsR.push_back(queueR);
+			waypointsID.push_back(queueID);
+		}
+
+	}
 	// Set up heatmap (relevant for Assignment 4)
 	setupHeatmapSeq();
 }
@@ -74,8 +112,7 @@ void Ped::Model::tick()
 		threads_tick();
 		break;
 	case VECTOR:
-		std::cout << "Vector tick not implemented." << std::endl;
-		exit(1);
+		vector_tick();
 		break;
 	case CUDA:
 		std::cout << "CUDA tick not implemented." << std::endl;
@@ -169,6 +206,31 @@ void Ped::Model::threads_tick()
 	for (std::thread &thread : threads)
 	{
 		thread.join();
+	}
+}
+
+void Ped::Model::vector_tick()
+{
+	int num_agents = x.size();
+
+	// handle the destiantions
+	Ped::Tagent::getNextDestinationSIMD(x.data(), y.data(), destinationsX.data(), destinationsY.data(), destinationsR.data(), destinationsID.data(), destinationsX.data(), destinationsY.data(), destinationsR.data(), destinationsID.data(), num_agents, waypointsX, waypointsY, waypointsR, waypointsID);
+
+	Ped::Tagent::computeDesiredPositionsSIMD2(x.data(), y.data(), destinationsX.data(), destinationsY.data(), desiredPositionX.data(), desiredPositionY.data(), num_agents);
+
+	assert(desiredPositionX.size() == num_agents && desiredPositionY.size() == num_agents);
+	assert(x.size() == num_agents && y.size() == num_agents);
+	assert(waypointsX.size() == num_agents && waypointsY.size() == num_agents && waypointsR.size() == num_agents && waypointsID.size() == num_agents);
+
+	// Update the positions of the agents
+	int i = 0;
+	for (; i < num_agents; i++)
+	{
+		x[i] = desiredPositionX[i];
+		y[i] = desiredPositionY[i];
+
+		agents[i]->setX(x[i]);
+		agents[i]->setY(y[i]);
 	}
 }
 

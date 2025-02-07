@@ -14,6 +14,11 @@
 #include <vector>
 #include <map>
 #include <set>
+#include <deque>
+#include <assert.h>
+#include "AlignedAllocator.h"
+
+#include <arm_neon.h>
 
 #include "ped_agent.h"
 
@@ -43,6 +48,10 @@ namespace Ped{
 
 		// tick for c++ thread implementation
 		void threads_tick();
+
+		// tick for vector implementation (SIMD)
+		void vector_tick();
+
 
 		// Returns the agents of this scenario
 		const std::vector<Tagent*>& getAgents() const { return agents; };
@@ -75,6 +84,53 @@ namespace Ped{
 
 		// Moves an agent towards its next position
 		void move(Ped::Tagent *agent);
+
+
+		// SoA (Structure of Arrays) layout for the SIMD implementation
+
+		// Agent's positions
+		/*
+		std::vector<float> x;
+		std::vector<float> y;
+
+		// Agent's desired positions
+		std::vector<float> desiredPositionX;
+		std::vector<float> desiredPositionY;
+
+		std::vector<float> destinationsX;
+		std::vector<float> destinationsY;
+		std::vector<float> destinationsR;
+		std::vector<int> destinationsID;
+
+		std::vector<float> lastDestX;
+		std::vector<float> lastDestY;
+		std::vector<float> lastDestR;
+		std::vector<int> lastDestID;
+		*/
+
+
+		FloatVectorAligned32 x;
+		FloatVectorAligned32 y;
+
+		FloatVectorAligned32 desiredPositionX;
+		FloatVectorAligned32 desiredPositionY;
+
+		FloatVectorAligned32 destinationsX;
+		FloatVectorAligned32 destinationsY;
+		FloatVectorAligned32 destinationsR;
+		IntVectorAligned32 destinationsID;
+
+		FloatVectorAligned32 lastDestX;
+		FloatVectorAligned32 lastDestY;
+		FloatVectorAligned32 lastDestR;
+		IntVectorAligned32 lastDestID;
+
+		// The queue of all destinations that this agent still has to visit		
+		// 		simd SoA layout of deque<Twaypoint *> waypoints;
+		std::vector<std::deque<float>> waypointsX;
+		std::vector<std::deque<float>> waypointsY;
+		std::vector<std::deque<float>> waypointsR;
+		std::vector<std::deque<int>> waypointsID;
 
 		////////////
 		/// Everything below here won't be relevant until Assignment 3
