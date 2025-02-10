@@ -7,7 +7,6 @@
 //
 #include "ped_model.h"
 #include "ped_waypoint.h"
-#include "ped_model.h"
 #include <iostream>
 #include <stack>
 #include <algorithm>
@@ -15,12 +14,23 @@
 #include <thread>
 #include <cmath>
 #include <vector>
+#include <emmintrin.h>
+
 
 #ifndef NOCDUA
 #include "cuda_testkernel.h"
 #endif
 
 #include <stdlib.h>
+
+
+namespace Ped {
+    std::vector<float> X;
+    std::vector<float> Y;
+    std::vector<float> desiredX;
+    std::vector<float> desiredY;
+}
+
 
 int Ped::Model::numberOfThreads = omp_get_num_threads(); // by default use the number of threads available unless specified otherwise
 
@@ -44,6 +54,22 @@ void Ped::Model::setup(std::vector<Ped::Tagent *> agentsInScenario, std::vector<
 
 	// Set up heatmap (relevant for Assignment 4)
 	setupHeatmapSeq();
+
+	// Initialize global vectors
+	int num_agents = agents.size();
+	X.resize(num_agents);
+    Y.resize(num_agents);
+	desiredX.resize(num_agents);
+	desiredY.resize(num_agents);	
+
+	// Populate global vectors with starting data
+	for (int i=0; i<num_agents; ++i) {
+		agents[i]->setID(i); // Set ID for current agent
+		X[i] = agents[i]->getX();		
+        Y[i] = agents[i]->getY();
+		desiredX[i] = agents[i]->getDesiredX();
+		desiredY[i] = agents[i]->getDesiredY();
+	}
 }
 
 /*
@@ -68,14 +94,13 @@ void Ped::Model::tick()
 		sequential_tick();
 		break;
 	case OMP:
-		openmp_tick1();
+		openmp_tick2();
 		break;
 	case THREADS:
-		threads_tick();
+		//threads_tick();
 		break;
 	case VECTOR:
-		std::cout << "Vector tick not implemented." << std::endl;
-		exit(1);
+		vector_tick();
 		break;
 	case CUDA:
 		std::cout << "CUDA tick not implemented." << std::endl;
@@ -87,31 +112,58 @@ void Ped::Model::tick()
 	}
 }
 
+
 void Ped::Model::sequential_tick()
 {
-	for (Ped::Tagent *agent : agents)
+	int num_agents = agents.size();
+
+	for (int i = 0; i<num_agents; ++i)
 	{
 		// Compute the next desired position of the agent
-		agent->computeNextDesiredPosition();
+		agents[i]->computeNextDesiredPosition();
 
 		// Set the agent's position to the desired position
-		agent->setX(agent->getDesiredX());
-		agent->setY(agent->getDesiredY());
+		X[i] = desiredX[i];
+		Y[i] = desiredY[i];
+		
+		// TESTING
+		agents[i]->setX(desiredX[i]);
+		agents[i]->setY(desiredY[i]);
+
 	}
 }
 
-void Ped::Model::openmp_tick1()
+void Ped::Model::vector_tick()
 {
-#pragma omp parallel for shared(agents) schedule(guided) num_threads(numberOfThreads)
-	for (int i = 0; i < agents.size(); i++)
-	{
-		// compute the next desired position of the agent
-		agents[i]->computeNextDesiredPosition();
+	int num_agents = agents.size();
+	
+	// Initialize outside of loop, to access it for remaining agents
+	int i=0;
 
-		// set the agent's position to the desired position
-		agents[i]->setX(agents[i]->getDesiredX());
-		agents[i]->setY(agents[i]->getDesiredY());
+	for (; i<= num_agents-4; i += 4) {
+
+		// Compute next desired positions for agents i to i+3
+		agents[i]->computeNextDesiredPosition();
+		agents[i+1]->computeNextDesiredPosition();
+		agents[i+2]->computeNextDesiredPosition();
+		agents[i+3]->computeNextDesiredPosition();
+
+		// Load desired positions for agents i to i+3
+		__m128 next_x = _mm_loadu_ps(&desiredX[i]);
+		__m128 next_y = _mm_loadu_ps(&desiredY[i]);
+
+		// Store desired positions back into X, Y
+		_mm_storeu_ps(&X[i], next_x);
+		_mm_storeu_ps(&Y[i], next_y);	
+
 	}
+
+	// Take care of any leftover loops/agents if num_agents not multiple of 4
+	for (; i < num_agents; i++) {
+		agents[i]->computeNextDesiredPosition();
+		X[i] = desiredX[i];
+		Y[i] = desiredY[i];
+	}	
 }
 
 void Ped::Model::openmp_tick2()
@@ -124,12 +176,15 @@ void Ped::Model::openmp_tick2()
 		for (int i = 0; i < agents.size(); i++)
 		{
 			agents[i]->computeNextDesiredPosition();
-			agents[i]->setX(agents[i]->getDesiredX());
-			agents[i]->setY(agents[i]->getDesiredY());
+			X[i] = desiredX[i];
+			Y[i] = desiredY[i];
+			// TESTING
+			agents[i]->setX(desiredX[i]);
+			agents[i]->setY(desiredY[i]);
 		}
 	}
 }
-
+/*
 void Ped::Model::threads_tick()
 {
 	// Helper function to process a range of agents
@@ -171,6 +226,7 @@ void Ped::Model::threads_tick()
 		thread.join();
 	}
 }
+*/
 
 ////////////
 /// Everything below here relevant for Assignment 3.

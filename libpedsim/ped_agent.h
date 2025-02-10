@@ -22,10 +22,17 @@
 using namespace std;
 
 namespace Ped {
+
+	extern std::vector<float> X;
+	extern std::vector<float> Y;
+	extern std::vector<float> desiredX;
+	extern std::vector<float> desiredY;
+
 	class Twaypoint;
 
 	class Tagent {
 	public:
+
 		Tagent(int posX, int posY);
 		Tagent(double posX, double posY);
 
@@ -37,9 +44,15 @@ namespace Ped {
 		void setX(int newX) { x = newX; }
 		void setY(int newY) { y = newY; }
 
+		// Sets agent's ID
+		void setID(int agentID) { id = agentID; }
+
 		// Update the position according to get closer
 		// to the current destination
 		void computeNextDesiredPosition();
+
+		//Get agent id
+		int getId() const { return id; };
 
 		// Position of agent defined by x and y
 		int getX() const { return x; };
@@ -50,6 +63,8 @@ namespace Ped {
 
 	private:
 		Tagent() {};
+
+		int id; // Agent index, for global arrays
 
 		// The agent's current position
 		int x;

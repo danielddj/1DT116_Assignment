@@ -5,8 +5,10 @@
 //
 // Adapted for Low Level Parallel Programming 2017
 //
+#include <iostream>
 #include "ped_agent.h"
 #include "ped_waypoint.h"
+#include "ped_model.h"
 #include <math.h>
 
 #include <stdlib.h>
@@ -34,11 +36,13 @@ void Ped::Tagent::computeNextDesiredPosition() {
 		return;
 	}
 
-	double diffX = destination->getx() - x;
-	double diffY = destination->gety() - y;
+	double diffX = destination->getx() - X[id];
+	double diffY = destination->gety() - Y[id];
 	double len = sqrt(diffX * diffX + diffY * diffY);
-	desiredPositionX = (int)round(x + diffX / len);
-	desiredPositionY = (int)round(y + diffY / len);
+
+	//Store into vectors instead of Agent object
+	desiredX[id] = (int)round(X[id] + diffX / len);
+	desiredY[id] = (int)round(Y[id] + diffY / len);	
 }
 
 void Ped::Tagent::addWaypoint(Twaypoint* wp) {
@@ -51,8 +55,8 @@ Ped::Twaypoint* Ped::Tagent::getNextDestination() {
 
 	if (destination != NULL) {
 		// compute if agent reached its current destination
-		double diffX = destination->getx() - x;
-		double diffY = destination->gety() - y;
+		double diffX = destination->getx() - X[id];
+		double diffY = destination->gety() - Y[id];
 		double length = sqrt(diffX * diffX + diffY * diffY);
 		agentReachedDestination = length < destination->getr();
 	}

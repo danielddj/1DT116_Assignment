@@ -18,6 +18,13 @@
 #include "ped_agent.h"
 
 namespace Ped{
+
+	// Global vectors
+	extern std::vector<float> X;
+	extern std::vector<float> Y;
+	extern std::vector<float> desiredX;
+	extern std::vector<float> desiredY;
+
 	class Tagent;
 
 	// The implementation modes for Assignment 1 + 2:
@@ -27,7 +34,6 @@ namespace Ped{
 	class Model
 	{
 	public:
-
 		// Sets everything up
 		void setup(std::vector<Tagent*> agentsInScenario, std::vector<Twaypoint*> destinationsInScenario,IMPLEMENTATION implementation);
 		
@@ -36,6 +42,8 @@ namespace Ped{
 
 		// tick for sequential implementation
 		void sequential_tick();
+
+		void vector_tick();
 
 		// tick for openmp implementation
 		void openmp_tick1();
