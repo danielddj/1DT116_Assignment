@@ -19,12 +19,6 @@
 
 namespace Ped{
 
-	// Global vectors
-	extern std::vector<float> X;
-	extern std::vector<float> Y;
-	extern std::vector<float> desiredX;
-	extern std::vector<float> desiredY;
-
 	class Tagent;
 
 	// The implementation modes for Assignment 1 + 2:

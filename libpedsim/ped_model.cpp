@@ -29,6 +29,8 @@ namespace Ped {
     std::vector<float> Y;
     std::vector<float> desiredX;
     std::vector<float> desiredY;
+	std::vector<float> destinationX;
+	std::vector<float> destinationY;
 }
 
 
@@ -58,7 +60,7 @@ void Ped::Model::setup(std::vector<Ped::Tagent *> agentsInScenario, std::vector<
 	// Initialize global vectors
 	int num_agents = agents.size();
 	X.resize(num_agents);
-    Y.resize(num_agents);
+	Y.resize(num_agents);
 	desiredX.resize(num_agents);
 	desiredY.resize(num_agents);	
 
@@ -84,9 +86,6 @@ For now, the agents are "ghosts" and cannot collide with each other.
 */
 void Ped::Model::tick()
 {
-
-	// EDIT HERE FOR ASSIGNMENT 1
-
 	// Choose the implementation to use
 	switch (implementation)
 	{
@@ -97,7 +96,7 @@ void Ped::Model::tick()
 		openmp_tick2();
 		break;
 	case THREADS:
-		//threads_tick();
+		threads_tick();
 		break;
 	case VECTOR:
 		vector_tick();
@@ -126,7 +125,7 @@ void Ped::Model::sequential_tick()
 		X[i] = desiredX[i];
 		Y[i] = desiredY[i];
 		
-		// TESTING
+		// TESTING (for visualization)
 		agents[i]->setX(desiredX[i]);
 		agents[i]->setY(desiredY[i]);
 
@@ -149,12 +148,27 @@ void Ped::Model::vector_tick()
 		agents[i+3]->computeNextDesiredPosition();
 
 		// Load desired positions for agents i to i+3
-		__m128 next_x = _mm_loadu_ps(&desiredX[i]);
-		__m128 next_y = _mm_loadu_ps(&desiredY[i]);
+		__m128 next_x = _mm_load_ps(&desiredX[i]);
+		__m128 next_y = _mm_load_ps(&desiredY[i]);
 
 		// Store desired positions back into X, Y
-		_mm_storeu_ps(&X[i], next_x);
-		_mm_storeu_ps(&Y[i], next_y);	
+		_mm_store_ps(&X[i], next_x);
+		_mm_store_ps(&Y[i], next_y);	
+
+		/* TESTING ONLY (for visualization) remove for performance */
+		/*
+		agents[i]->setX(desiredX[i]);
+		agents[i]->setY(desiredY[i]);
+
+		agents[i+1]->setX(desiredX[i+1]);
+		agents[i+1]->setY(desiredY[i+1]);
+
+		agents[i+2]->setX(desiredX[i+2]);
+		agents[i+2]->setY(desiredY[i+2]);
+
+		agents[i+3]->setX(desiredX[i+3]);
+		agents[i+3]->setY(desiredY[i+3]);
+		*/
 
 	}
 
@@ -178,13 +192,14 @@ void Ped::Model::openmp_tick2()
 			agents[i]->computeNextDesiredPosition();
 			X[i] = desiredX[i];
 			Y[i] = desiredY[i];
-			// TESTING
+
+			// TESTING (visualization)
 			agents[i]->setX(desiredX[i]);
 			agents[i]->setY(desiredY[i]);
 		}
 	}
 }
-/*
+
 void Ped::Model::threads_tick()
 {
 	// Helper function to process a range of agents
@@ -193,8 +208,12 @@ void Ped::Model::threads_tick()
 		for (int i = start; i < end; i++)
 		{
 			agents[i]->computeNextDesiredPosition();
-			agents[i]->setX(agents[i]->getDesiredX());
-			agents[i]->setY(agents[i]->getDesiredY());
+			X[i] = desiredX[i];
+			Y[i] = desiredY[i];
+
+			// TESTING (visualization)
+			agents[i]->setX(desiredX[i]);
+			agents[i]->setY(desiredY[i]);
 		}
 	};
 
@@ -207,7 +226,6 @@ void Ped::Model::threads_tick()
 	// launch threads and distribute the work to them
 	for (int t = 0; t < numberOfThreads; t++)
 	{
-
 		// start and end index (of the agents) for current thread
 		int start = t * agentsPerThread;
 		int end = std::min(start + agentsPerThread, totalAgents);
@@ -226,7 +244,7 @@ void Ped::Model::threads_tick()
 		thread.join();
 	}
 }
-*/
+
 
 ////////////
 /// Everything below here relevant for Assignment 3.

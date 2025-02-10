@@ -31,8 +31,7 @@ void Ped::Tagent::init(int posX, int posY) {
 void Ped::Tagent::computeNextDesiredPosition() {
 	destination = getNextDestination();
 	if (destination == NULL) {
-		// no destination, no need to
-		// compute where to move to
+		// no destination, no need to compute where to move to
 		return;
 	}
 
@@ -41,8 +40,8 @@ void Ped::Tagent::computeNextDesiredPosition() {
 	double len = sqrt(diffX * diffX + diffY * diffY);
 
 	//Store into vectors instead of Agent object
-	desiredX[id] = (int)round(X[id] + diffX / len);
-	desiredY[id] = (int)round(Y[id] + diffY / len);	
+	desiredX[id] = (float)round(X[id] + diffX / len);
+	desiredY[id] = (float)round(Y[id] + diffY / len);	
 }
 
 void Ped::Tagent::addWaypoint(Twaypoint* wp) {
@@ -68,6 +67,7 @@ Ped::Twaypoint* Ped::Tagent::getNextDestination() {
 		nextDestination = waypoints.front();
 		waypoints.pop_front();
 	}
+
 	else {
 		// Case 2: agent has not yet reached destination, continue to move towards
 		// current destination

@@ -18,6 +18,7 @@
 
 #include <vector>
 #include <deque>
+#include <emmintrin.h>
 
 using namespace std;
 
@@ -27,6 +28,8 @@ namespace Ped {
 	extern std::vector<float> Y;
 	extern std::vector<float> desiredX;
 	extern std::vector<float> desiredY;
+	extern std::vector<float> destinationX;
+	extern std::vector<float> destinationY;
 
 	class Twaypoint;
 
