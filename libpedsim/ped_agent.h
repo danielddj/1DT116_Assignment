@@ -24,77 +24,77 @@ using namespace std;
 
 namespace Ped {
 
-	extern std::vector<float> X;
-	extern std::vector<float> Y;
-	extern std::vector<float> desiredX;
-	extern std::vector<float> desiredY;
-	extern std::vector<float> destinationX;
-	extern std::vector<float> destinationY;
+    extern std::vector<float> X;
+    extern std::vector<float> Y;
+    extern std::vector<float> desiredX;
+    extern std::vector<float> desiredY;
+    extern std::vector<float> destinationX;
+    extern std::vector<float> destinationY;
 
-	class Twaypoint;
+    class Twaypoint;
 
-	class Tagent {
-	public:
+    class Tagent {
+    public:
 
-		Tagent(int posX, int posY);
-		Tagent(double posX, double posY);
+        Tagent(int posX, int posY);
+        Tagent(double posX, double posY);
 
-		// Returns the coordinates of the desired position
-		int getDesiredX() const { return desiredPositionX; }
-		int getDesiredY() const { return desiredPositionY; }
+        // Returns the coordinates of the desired position
+        int getDesiredX() const { return desiredPositionX; }
+        int getDesiredY() const { return desiredPositionY; }
 
-		// Sets the agent's position
-		void setX(int newX) { x = newX; }
-		void setY(int newY) { y = newY; }
+        // Sets the agent's position
+        void setX(int newX) { x = newX; }
+        void setY(int newY) { y = newY; }
 
-		// Sets agent's ID
-		void setID(int agentID) { id = agentID; }
+        // Sets agent's ID
+        void setID(int agentID) { id = agentID; }
 
-		// Update the position according to get closer
-		// to the current destination
-		void computeNextDesiredPosition();
+        // Update the position according to get closer
+        // to the current destination
+        void computeNextDesiredPosition();
 
-		// Call getNextDestination() 
-		void callNextDestination();
+        // Call getNextDestination() 
+        void callNextDestination();
 
-		//Get agent id
-		int getId() const { return id; };
+        //Get agent id
+        int getId() const { return id; };
 
-		// Position of agent defined by x and y
-		int getX() const { return x; };
-		int getY() const { return y; };
+        // Position of agent defined by x and y
+        int getX() const { return x; };
+        int getY() const { return y; };
 
-		// Adds a new waypoint to reach for this agent
-		void addWaypoint(Twaypoint* wp);
+        // Adds a new waypoint to reach for this agent
+        void addWaypoint(Twaypoint* wp);
 
-	private:
-		Tagent() {};
+    private:
+        Tagent() {};
 
-		int id; // Agent index, for global arrays
+        int id; // Agent index, for global arrays
 
-		// The agent's current position
-		int x;
-		int y;
+        // The agent's current position
+        int x;
+        int y;
 
-		// The agent's desired next position
-		int desiredPositionX;
-		int desiredPositionY;
+        // The agent's desired next position
+        int desiredPositionX;
+        int desiredPositionY;
 
-		// The current destination (may require several steps to reach)
-		Twaypoint* destination;
+        // The current destination (may require several steps to reach)
+        Twaypoint* destination;
 
-		// The last destination
-		Twaypoint* lastDestination;
+        // The last destination
+        Twaypoint* lastDestination;
 
-		// The queue of all destinations that this agent still has to visit
-		deque<Twaypoint*> waypoints;
+        // The queue of all destinations that this agent still has to visit
+        deque<Twaypoint*> waypoints;
 
-		// Internal init function 
-		void init(int posX, int posY);
+        // Internal init function 
+        void init(int posX, int posY);
 
-		// Returns the next destination to visit
-		Twaypoint* getNextDestination();
-	};
+        // Returns the next destination to visit
+        Twaypoint* getNextDestination();
+    };
 }
 
 #endif

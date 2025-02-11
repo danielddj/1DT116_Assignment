@@ -14,18 +14,18 @@
 #include <stdlib.h>
 
 Ped::Tagent::Tagent(int posX, int posY) {
-	Ped::Tagent::init(posX, posY);
+    Ped::Tagent::init(posX, posY);
 }
 
 Ped::Tagent::Tagent(double posX, double posY) {
-	Ped::Tagent::init((int)round(posX), (int)round(posY));
+    Ped::Tagent::init((int)round(posX), (int)round(posY));
 }
 
 void Ped::Tagent::init(int posX, int posY) {
-	x = posX;
-	y = posY;
-	destination = NULL;
-	lastDestination = NULL;
+    x = posX;
+    y = posY;
+    destination = NULL;
+    lastDestination = NULL;
 }
 
 
@@ -35,25 +35,25 @@ void Ped::Tagent::callNextDestination() {
 
 
 void Ped::Tagent::computeNextDesiredPosition() {
-	destination = getNextDestination();
+    destination = getNextDestination();
     
-	if (destination == NULL) {
-		// no destination, no need to compute where to move to
-		return;
-	} 
+    if (destination == NULL) {
+        // no destination, no need to compute where to move to
+        return;
+    } 
 
-	double diffX = destination->getx() - X[id];
-	double diffY = destination->gety() - Y[id];
-	double len = sqrt(diffX * diffX + diffY * diffY);
+    double diffX = destination->getx() - X[id];
+    double diffY = destination->gety() - Y[id];
+    double len = sqrt(diffX * diffX + diffY * diffY);
 
-	//Store into vectors instead of Agent object
-	desiredX[id] = (float)round(X[id] + diffX / len);
-	desiredY[id] = (float)round(Y[id] + diffY / len);	
+    //Store into vectors instead of Agent object
+    desiredX[id] = (float)round(X[id] + diffX / len);
+    desiredY[id] = (float)round(Y[id] + diffY / len);	
     
 }
 
 void Ped::Tagent::addWaypoint(Twaypoint* wp) {
-	waypoints.push_back(wp);
+    waypoints.push_back(wp);
 }
 
 Ped::Twaypoint* Ped::Tagent::getNextDestination() {
