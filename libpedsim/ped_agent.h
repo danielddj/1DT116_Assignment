@@ -18,7 +18,7 @@
 
 #include <vector>
 #include <deque>
-#include <emmintrin.h>
+#include <immintrin.h>
 
 using namespace std;
 
@@ -53,6 +53,9 @@ namespace Ped {
 		// Update the position according to get closer
 		// to the current destination
 		void computeNextDesiredPosition();
+
+		// Call getNextDestination() 
+		void callNextDestination();
 
 		//Get agent id
 		int getId() const { return id; };

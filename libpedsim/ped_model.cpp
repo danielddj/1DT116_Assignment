@@ -14,7 +14,7 @@
 #include <thread>
 #include <cmath>
 #include <vector>
-#include <emmintrin.h>
+#include <immintrin.h>
 
 
 #ifndef NOCDUA
@@ -63,6 +63,8 @@ void Ped::Model::setup(std::vector<Ped::Tagent *> agentsInScenario, std::vector<
 	Y.resize(num_agents);
 	desiredX.resize(num_agents);
 	desiredY.resize(num_agents);	
+	destinationX.resize(num_agents);
+	destinationY.resize(num_agents);
 
 	// Populate global vectors with starting data
 	for (int i=0; i<num_agents; ++i) {
@@ -132,21 +134,64 @@ void Ped::Model::sequential_tick()
 	}
 }
 
+void Ped::Model::computeNextDesiredPosition_SIMD() 
+{
+	int num_agents = agents.size();
+	int i=0;
+
+	for (; i<= num_agents-4; i += 4) {
+
+		// Get next destination for agents i to i+3
+		agents[i]->callNextDestination();
+		agents[i+1]->callNextDestination();
+		agents[i+2]->callNextDestination();
+		agents[i+3]->callNextDestination();
+
+		// Load destination and curent position for agents i to i+3
+        __m128 destX = _mm_loadu_ps(&destinationX[i]);
+        __m128 destY = _mm_loadu_ps(&destinationY[i]);
+        __m128 posX = _mm_loadu_ps(&X[i]);
+        __m128 posY = _mm_loadu_ps(&Y[i]);
+
+        // Compute difference, destination - current
+        __m128 diffX = _mm_sub_ps(destX, posX);
+        __m128 diffY = _mm_sub_ps(destY, posY);
+
+        // sqrt(diffX * diffX + diffY * diffY);
+        __m128 len = _mm_sqrt_ps(_mm_add_ps(_mm_mul_ps(diffX, diffX), _mm_mul_ps(diffY, diffY)));
+
+        // Avoid division by zero 
+        __m128 mask = _mm_cmpneq_ps(len, _mm_setzero_ps());
+        len = _mm_or_ps(_mm_and_ps(mask, len), _mm_andnot_ps(mask, _mm_set1_ps(1.0f)));
+
+        // Normalize (diffX / len, diffY / len)
+        __m128 normX = _mm_div_ps(diffX, len);
+        __m128 normY = _mm_div_ps(diffY, len);
+
+        // New desired position 
+        __m128 newX = _mm_add_ps(posX, normX);
+        __m128 newY = _mm_add_ps(posY, normY);
+
+        // Rounding
+        __m128 roundedX = _mm_round_ps(newX, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
+        __m128 roundedY = _mm_round_ps(newY, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
+
+        // Store results
+        _mm_storeu_ps(&desiredX[i], roundedX);
+        _mm_storeu_ps(&desiredY[i], roundedY);
+	}
+
+}
+
 void Ped::Model::vector_tick()
 {
 	int num_agents = agents.size();
+	computeNextDesiredPosition_SIMD();
 	
 	// Initialize outside of loop, to access it for remaining agents
 	int i=0;
 
 	for (; i<= num_agents-4; i += 4) {
-
-		// Compute next desired positions for agents i to i+3
-		agents[i]->computeNextDesiredPosition();
-		agents[i+1]->computeNextDesiredPosition();
-		agents[i+2]->computeNextDesiredPosition();
-		agents[i+3]->computeNextDesiredPosition();
-
 		// Load desired positions for agents i to i+3
 		__m128 next_x = _mm_load_ps(&desiredX[i]);
 		__m128 next_y = _mm_load_ps(&desiredY[i]);
@@ -155,8 +200,7 @@ void Ped::Model::vector_tick()
 		_mm_store_ps(&X[i], next_x);
 		_mm_store_ps(&Y[i], next_y);	
 
-		/* TESTING ONLY (for visualization) remove for performance */
-		/*
+		/* TESTING ONLY (for visualization) remove for performance */		
 		agents[i]->setX(desiredX[i]);
 		agents[i]->setY(desiredY[i]);
 
@@ -167,8 +211,7 @@ void Ped::Model::vector_tick()
 		agents[i+2]->setY(desiredY[i+2]);
 
 		agents[i+3]->setX(desiredX[i+3]);
-		agents[i+3]->setY(desiredY[i+3]);
-		*/
+		agents[i+3]->setY(desiredY[i+3]);		
 
 	}
 
@@ -177,6 +220,10 @@ void Ped::Model::vector_tick()
 		agents[i]->computeNextDesiredPosition();
 		X[i] = desiredX[i];
 		Y[i] = desiredY[i];
+
+		// TESTING visualization
+		agents[i]->setX(desiredX[i]);
+		agents[i]->setY(desiredY[i]);
 	}	
 }
 
