@@ -24,6 +24,7 @@ namespace Ped
 		virtual int getDesiredY() const noexcept = 0;
 		virtual void setDesiredX(int val) noexcept = 0;
 		virtual void setDesiredY(int val) noexcept = 0;
+		virtual size_t getIndex() const noexcept = 0;
 
 		virtual Twaypoint *getDestination() const noexcept = 0;
 		virtual void setDestination(Twaypoint *dest) noexcept = 0;
@@ -110,6 +111,8 @@ namespace Ped
 		void computeNextDesiredPosition();
 		void addWaypoint(Twaypoint *wp);
 		void getNextDestination();
+
+		size_t getIndex() const noexcept { return index; }
 
 		// Inline accessors to mimic the old interface:
 		inline int getX() const noexcept { return static_cast<int>(soa->x[index]); }

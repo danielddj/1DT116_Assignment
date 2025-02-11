@@ -177,21 +177,35 @@ void Ped::Model::vector_tick()
 	Ped::TagentSoA::AgentSoA *agentData = agentSoA;
 	size_t n = agentData->numAgents;
 
-	// Compute the next desired position of the agents
+	// Compute the next desired positions of the agents.
 	agents[0]->computeNextDesiredPosition();
 
-	for (size_t i = 0; i < n; i += 4)
+	size_t i = 0;
+	// Process agents in blocks of 4.
+
+	for (int j = 0; j < n; j++)
 	{
-		// Load the desired positions of the agents
-		__m128 desiredX = _mm_load_ps((agentData->desiredX) + i);
-		__m128 desiredY = _mm_load_ps((agentData->desiredY) + i);
+		if (agentData->x[j] < 1.0f)
+		{
+			printf("%d", j);
+		}
+	}
 
-		// Set the agent's position to the desired position
-		__m128 x = desiredX;
-		__m128 y = desiredY;
+	for (; i + 4 <= n; i += 4)
+	{
+		__m128 desiredX = _mm_load_ps(agentData->desiredX + i);
+		__m128 desiredY = _mm_load_ps(agentData->desiredY + i);
 
-		_mm_store_ps((agentData->x) + i, x);
-		_mm_store_ps((agentData->y) + i, y);
+		// Update the agent positions with the desired positions.
+		_mm_store_ps(agentData->x + i, desiredX);
+		_mm_store_ps(agentData->y + i, desiredY);
+	}
+
+	// Process any remaining agents (the "leftovers") one by one.
+	for (; i < n; i++)
+	{
+		agentData->x[i] = agentData->desiredX[i];
+		agentData->y[i] = agentData->desiredY[i];
 	}
 }
 

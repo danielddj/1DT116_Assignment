@@ -15,11 +15,17 @@ namespace Ped
 	// Compute the next desired position for this agent.
 	void TagentSoA::computeNextDesiredPosition()
 	{
+		// First update the destination positions.
 		getNextDestination();
 
-		for (size_t i = 0; i < soa->numAgents; i += 4)
+		size_t i = 0;
+		// Process agents in blocks of 4.
+		for (; i + 4 <= soa->numAgents; i += 4)
 		{
-			__m128 has_dest = _mm_cmpneq_ps(_mm_load_ps(reinterpret_cast<float *>(soa->currentWaypointIndex + i)), _mm_set1_ps(-1.0f));
+			__m128i currentWaypointIndexInt = _mm_load_si128(reinterpret_cast<const __m128i *>(soa->currentWaypointIndex + i));
+			__m128 currentWaypointIndexFloat = _mm_cvtepi32_ps(currentWaypointIndexInt);
+
+			__m128 has_dest = _mm_cmpneq_ps(currentWaypointIndexFloat, _mm_set1_ps(-1.0f));
 
 			__m128 currX = _mm_load_ps(soa->x + i);
 			__m128 currY = _mm_load_ps(soa->y + i);
@@ -28,10 +34,13 @@ namespace Ped
 
 			__m128 diffX = _mm_sub_ps(destX, currX);
 			__m128 diffY = _mm_sub_ps(destY, currY);
-			__m128 length = _mm_sqrt_ps(_mm_add_ps(_mm_mul_ps(diffX, diffX), _mm_mul_ps(diffY, diffY)));
+			__m128 length = _mm_sqrt_ps(_mm_add_ps(_mm_mul_ps(diffX, diffX),
+												   _mm_mul_ps(diffY, diffY)));
 
-			__m128 desiredX = _mm_add_ps(currX, _mm_div_ps(diffX, length));
-			__m128 desiredY = _mm_add_ps(currY, _mm_div_ps(diffY, length));
+			__m128 normX = _mm_div_ps(diffX, length);
+			__m128 normY = _mm_div_ps(diffY, length);
+			__m128 desiredX = _mm_add_ps(currX, normX);
+			__m128 desiredY = _mm_add_ps(currY, normY);
 
 			__m128 desiredX_rounded = _mm_round_ps(desiredX, _MM_FROUND_TO_NEAREST_INT);
 			__m128 desiredY_rounded = _mm_round_ps(desiredY, _MM_FROUND_TO_NEAREST_INT);
@@ -39,8 +48,43 @@ namespace Ped
 			__m128 desiredX_update = _mm_blendv_ps(currX, desiredX_rounded, has_dest);
 			__m128 desiredY_update = _mm_blendv_ps(currY, desiredY_rounded, has_dest);
 
-			_mm_store_ps(soa->desiredX + i, desiredX);
-			_mm_store_ps(soa->desiredY + i, desiredY);
+			_mm_store_ps(soa->desiredX + i, desiredX_update);
+			_mm_store_ps(soa->desiredY + i, desiredY_update);
+		}
+
+		for (; i < soa->numAgents; i++)
+		{
+
+			if (soa->currentWaypointIndex[i] != -1)
+			{
+				float currX = soa->x[i];
+				float currY = soa->y[i];
+				float destX = soa->destX[i];
+				float destY = soa->destY[i];
+
+				float dx = destX - currX;
+				float dy = destY - currY;
+				float len = std::sqrt(dx * dx + dy * dy);
+
+				if (len == 0.0f)
+				{
+					soa->desiredX[i] = currX;
+					soa->desiredY[i] = currY;
+				}
+				else
+				{
+					float desiredX = currX + (dx / len);
+					float desiredY = currY + (dy / len);
+
+					soa->desiredX[i] = std::round(desiredX);
+					soa->desiredY[i] = std::round(desiredY);
+				}
+			}
+			else
+			{
+				soa->desiredX[i] = soa->x[i];
+				soa->desiredY[i] = soa->y[i];
+			}
 		}
 	}
 
@@ -78,34 +122,18 @@ namespace Ped
 		soa->numWaypointsForAgent[index]++;
 	}
 
-	void flipArray(float maskArray[4])
-	{
-		// For an array of 4, we only need to swap 2 pairs.
-		for (int i = 0; i < 2; i++)
-		{
-			float temp = maskArray[i];
-			maskArray[i] = maskArray[3 - i];
-			maskArray[3 - i] = temp;
-		}
-	}
-
-// Retrieve the next destination.
-#include <immintrin.h>
-#include <stdexcept>
-#include <iostream>
-
 	void Ped::TagentSoA::getNextDestination()
 	{
-		// Process agents in groups of 4.
-		for (size_t i = 0; i < soa->numAgents; i += 4)
+		size_t i = 0;
+
+		// Process agents in groups of 4 using SIMD
+		for (; i + 3 < soa->numAgents; i += 4)
 		{
 			__m128i waypointsIndexInt = _mm_load_si128(reinterpret_cast<const __m128i *>(soa->currentWaypointIndex + i));
 			__m128 waypointsIndex = _mm_cvtepi32_ps(waypointsIndexInt);
 
-
 			__m128 no_waypoint_mask = _mm_cmpeq_ps(_mm_round_ps(waypointsIndex, _MM_FROUND_TO_NEAREST_INT), _mm_set1_ps(-1.0f));
 			__m128 valid_waypoints = _mm_blendv_ps(waypointsIndex, _mm_set1_ps(0.0f), no_waypoint_mask);
-
 
 			__m128 currX = _mm_load_ps(soa->x + i);
 			__m128 currY = _mm_load_ps(soa->y + i);
@@ -122,14 +150,11 @@ namespace Ped
 				soa->waypoints->r[soa->waypointList[soa->currentWaypointIndex[i + 1]]],
 				soa->waypoints->r[soa->waypointList[soa->currentWaypointIndex[i]]]);
 
-
 			__m128 reached_destination_mask = _mm_cmplt_ps(length, radius);
 			__m128 next_waypoint = _mm_add_ps(valid_waypoints, _mm_set1_ps(1.0f));
 
 			// Blend: if destination reached, use next_waypoint; else, keep the current value.
 			__m128 newWaypointIndex = _mm_blendv_ps(waypointsIndex, next_waypoint, reached_destination_mask);
-
-
 			__m128i newWaypointIndexInt = _mm_cvtps_epi32(newWaypointIndex);
 			_mm_store_si128(reinterpret_cast<__m128i *>(soa->currentWaypointIndex + i), newWaypointIndexInt);
 
@@ -142,7 +167,6 @@ namespace Ped
 				}
 			}
 
-
 			alignas(16) float maskArray[4];
 			_mm_store_ps(maskArray, reached_destination_mask);
 
@@ -151,7 +175,6 @@ namespace Ped
 
 			for (int j = 0; j < 4; j++)
 			{
-				// A nonzero mask value indicates this lane (agent) has reached its destination.
 				if (maskArray[j] != 0.0f)
 				{
 					int agentIndex = static_cast<int>(i + j);
@@ -167,15 +190,44 @@ namespace Ped
 						int wp_id = soa->waypointList[listIndex];
 						soa->destX[agentIndex] = soa->waypoints->x[wp_id];
 						soa->destY[agentIndex] = soa->waypoints->y[wp_id];
-
-						// Debug output for the first agent.
-						if (i == 0 && j == 0)
-						{
-							std::cout << "Agent " << agentIndex << ", waypoint slot " << waypointSlot << std::endl;
-							std::cout << "Modulo result: " << soa->currentWaypointIndex[0] % soa->numWaypointsForAgent[0] << std::endl;
-						}
 					}
 				}
+			}
+		}
+
+		// **Process leftover agents (1 to 3 agents left)**
+		for (; i < soa->numAgents; i++)
+		{
+			int waypointsIndex = soa->currentWaypointIndex[i];
+
+			if (waypointsIndex == -1)
+			{
+				continue; // Skip if no valid waypoint
+			}
+
+			float currX = soa->x[i];
+			float currY = soa->y[i];
+			float destX = soa->destX[i];
+			float destY = soa->destY[i];
+
+			float diffX = destX - currX;
+			float diffY = destY - currY;
+			float length = sqrt(diffX * diffX + diffY * diffY);
+
+			float radius = soa->waypoints->r[soa->waypointList[waypointsIndex]];
+
+			if (length < radius)
+			{
+				int nextWaypoint = waypointsIndex + 1;
+				if (nextWaypoint >= soa->numWaypointsForAgent[i])
+				{
+					nextWaypoint = nextWaypoint % soa->numWaypointsForAgent[i];
+				}
+				soa->currentWaypointIndex[i] = nextWaypoint;
+
+				int wp_id = soa->waypointList[i * soa->maxWaypointPerAgent + nextWaypoint];
+				soa->destX[i] = soa->waypoints->x[wp_id];
+				soa->destY[i] = soa->waypoints->y[wp_id];
 			}
 		}
 	}
