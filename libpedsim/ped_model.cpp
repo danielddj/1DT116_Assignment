@@ -24,7 +24,7 @@
 
 int Ped::Model::numberOfThreads = omp_get_num_threads(); // by default use the number of threads available unless specified otherwise
 
-void Ped::Model::setup(std::vector<Ped::Tagent *> agentsInScenario, std::vector<Twaypoint *> destinationsInScenario, Ped::AgentSoA *AgentSoAScenario, IMPLEMENTATION implementation)
+void Ped::Model::setup(std::vector<Ped::Tagent *> agentsInScenario, std::vector<Twaypoint *> destinationsInScenario, Ped::TagentSoA::AgentSoA *AgentSoAScenario, IMPLEMENTATION implementation)
 {
 #ifndef NOCUDA
 	// Convenience test: does CUDA work on this machine?
@@ -102,11 +102,11 @@ void Ped::Model::sequential_tick()
 
 void Ped::Model::openmp_tick1()
 {
+	agents.at(0)->computeNextDesiredPosition();
 #pragma omp parallel for shared(agents) schedule(guided) num_threads(numberOfThreads)
 	for (int i = 0; i < agents.size(); i++)
 	{
 		// compute the next desired position of the agent
-		agents[i]->computeNextDesiredPosition();
 
 		// set the agent's position to the desired position
 		agents[i]->setX(agents[i]->getDesiredX());
@@ -116,14 +116,14 @@ void Ped::Model::openmp_tick1()
 
 void Ped::Model::openmp_tick2()
 {
-// parallelize the outer loop for multiple ticks
+	// parallelize the outer loop for multiple ticks
+	agents.at(0)->computeNextDesiredPosition();
 #pragma omp parallel num_threads(numberOfThreads) shared(agents)
 	{
-// perform the tick operation for all agents
+		// perform the tick operation for all agents
 #pragma omp for schedule(static)
 		for (int i = 0; i < agents.size(); i++)
 		{
-			agents[i]->computeNextDesiredPosition();
 			agents[i]->setX(agents[i]->getDesiredX());
 			agents[i]->setY(agents[i]->getDesiredY());
 		}
@@ -135,9 +135,9 @@ void Ped::Model::threads_tick()
 	// Helper function to process a range of agents
 	auto processAgents = [](std::vector<Ped::Tagent *> &agents, int start, int end)
 	{
+		agents.at(0)->computeNextDesiredPosition();
 		for (int i = start; i < end; i++)
 		{
-			agents[i]->computeNextDesiredPosition();
 			agents[i]->setX(agents[i]->getDesiredX());
 			agents[i]->setY(agents[i]->getDesiredY());
 		}
@@ -172,60 +172,26 @@ void Ped::Model::threads_tick()
 	}
 }
 
-static inline __m128 round_ps(__m128 x)
-{
-	__m128 half = _mm_set1_ps(0.5);
-	__m128 sign_mask = _mm_set1_ps(-0.0);
-	__m128 bias = _mm_or_ps(half, _mm_and_ps(x, sign_mask));
-	__m128 biased = _mm_add_ps(x, bias);
-	__m128i i = _mm_cvttps_epi32(biased);
-	return _mm_cvtepi32_ps(i);
-}
-
 void Ped::Model::vector_tick()
 {
-	AgentSoA *agentData = agentSoA;
+	Ped::TagentSoA::AgentSoA *agentData = agentSoA;
 	size_t n = agentData->numAgents;
 
-	// Vectorized computation of desired positions
-	// Process four agents per iteration:
-	for (size_t i = 0; i < n; i += 4)
-	{
-		__m128 x_vec = _mm_load_ps(&agentData->x[i]);
-		__m128 y_vec = _mm_load_ps(&agentData->y[i]);
-
-		__m128 destX_vec = _mm_load_ps(&agentData->destX[i]);
-		__m128 destY_vec = _mm_load_ps(&agentData->destY[i]);
-
-		__m128 diffX = _mm_sub_ps(destX_vec, x_vec);
-		__m128 diffY = _mm_sub_ps(destY_vec, y_vec);
-
-		__m128 diffX_sq = _mm_mul_ps(diffX, diffX);
-		__m128 diffY_sq = _mm_mul_ps(diffY, diffY);
-
-		__m128 sum = _mm_add_ps(diffX_sq, diffY_sq);
-
-		__m128 len = _mm_sqrt_ps(sum);
-
-		__m128 ratioX = _mm_div_ps(diffX, len);
-		__m128 ratioY = _mm_div_ps(diffY, len);
-
-		__m128 newX = _mm_add_ps(x_vec, ratioX);
-		__m128 newY = _mm_add_ps(y_vec, ratioY);
-
-		__m128 roundedX = round_ps(newX);
-		__m128 roundedY = round_ps(newY);
-
-		_mm_store_ps(&agentData->desiredX[i], roundedX);
-		_mm_store_ps(&agentData->desiredY[i], roundedY);
-	}
+	// Compute the next desired position of the agents
+	agents[0]->computeNextDesiredPosition();
 
 	for (size_t i = 0; i < n; i += 4)
 	{
-		__m128 newPosX = _mm_load_ps(&agentData->desiredX[i]);
-		__m128 newPosY = _mm_load_ps(&agentData->desiredY[i]);
-		_mm_store_ps(&agentData->x[i], newPosX);
-		_mm_store_ps(&agentData->y[i], newPosY);
+		// Load the desired positions of the agents
+		__m128 desiredX = _mm_load_ps((agentData->desiredX) + i);
+		__m128 desiredY = _mm_load_ps((agentData->desiredY) + i);
+
+		// Set the agent's position to the desired position
+		__m128 x = _mm_round_ps(desiredX, _MM_FROUND_TO_NEAREST_INT);
+		__m128 y = _mm_round_ps(desiredY, _MM_FROUND_TO_NEAREST_INT);
+
+		_mm_store_ps((agentData->x) + i, x);
+		_mm_store_ps((agentData->y) + i, y);
 	}
 }
 

@@ -66,9 +66,10 @@ namespace Ped
 		double gety() const { return soa->y[id]; };
 		double getr() const { return soa->r[id]; };
 
+		waypointSoA *soa;
+
 	protected:
 		// id incrementer, used for assigning unique ids
-		waypointSoA *soa;
 
 		// waypoint id
 		int id;

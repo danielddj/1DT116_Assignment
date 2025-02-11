@@ -31,7 +31,7 @@ public:
 	// returns the collection of agents defined by this scenario
 	vector<Ped::Tagent *> getAgents() const;
 
-	Ped::AgentSoA *getAgentSoA() const;
+	Ped::TagentSoA::AgentSoA *getAgentSoA() const;
 
 	// contains all defined waypoints
 	vector<Ped::Twaypoint *> getWaypoints();
@@ -46,7 +46,7 @@ private:
 	// keep track of all agents that are generated
 	// within the current opened agents xml tag
 	vector<Ped::Tagent *> tempAgents;
-	Ped::AgentSoA *globalAgentSoA;
+	Ped::TagentSoA::AgentSoA *globalAgentSoA;
 
 	// contains all defined waypoints
 	map<string, Ped::Twaypoint *>

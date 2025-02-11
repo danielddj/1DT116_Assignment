@@ -37,7 +37,7 @@ namespace Ped
 	{
 	public:
 		// Sets everything up
-		void setup(std::vector<Tagent *> agentsInScenario, std::vector<Twaypoint *> destinationsInScenario, Ped::AgentSoA *AgentSoAScenario, IMPLEMENTATION implementation);
+		void setup(std::vector<Tagent *> agentsInScenario, std::vector<Twaypoint *> destinationsInScenario, Ped::TagentSoA::AgentSoA *AgentSoAScenario, IMPLEMENTATION implementation);
 
 		// Coordinates a time step in the scenario: move all agents by one step (if applicable).
 		void tick();
@@ -78,7 +78,7 @@ namespace Ped
 		// The agents in this scenario
 		std::vector<Tagent *> agents;
 
-		Ped::AgentSoA *agentSoA;
+		Ped::TagentSoA::AgentSoA *agentSoA;
 		// The waypoints in this scenario
 		std::vector<Twaypoint *>
 			destinations;

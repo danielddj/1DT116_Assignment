@@ -73,7 +73,7 @@ ParseScenario::ParseScenario(std::string filename, bool verbose)
 		totalAgents += n;
 	}
 
-	Ped::AgentSoA *AgentSoA = new Ped::AgentSoA(totalAgents);
+	Ped::TagentSoA::AgentSoA *AgentSoA = new Ped::TagentSoA::AgentSoA(totalAgents, totalWaypoints);
 	globalAgentSoA = AgentSoA;
 
 	if (verbose)
@@ -98,7 +98,7 @@ ParseScenario::ParseScenario(std::string filename, bool verbose)
 		{
 			int xPos = x + rand() / (RAND_MAX / dx) - dx / 2;
 			int yPos = y + rand() / (RAND_MAX / dy) - dy / 2;
-			Ped::Tagent *a = new Ped::Tagent(currentIndex, globalAgentSoA);
+			Ped::TagentSoA *a = new Ped::TagentSoA(currentIndex, globalAgentSoA);
 
 			// Initialize the agent's initial positions in the SoA:
 			globalAgentSoA->x[currentIndex] = static_cast<float>(xPos);
@@ -150,7 +150,7 @@ vector<Ped::Tagent *> ParseScenario::getAgents() const
 	return agents;
 }
 
-Ped::AgentSoA *ParseScenario::getAgentSoA() const
+Ped::TagentSoA::AgentSoA *ParseScenario::getAgentSoA() const
 {
 	return globalAgentSoA;
 }
