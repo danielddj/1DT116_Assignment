@@ -75,6 +75,11 @@ namespace Ped
 
 				for (size_t i = 0; i < numAgents; i++)
 				{
+					numWaypointsForAgent[i] = 0;
+				}
+
+				for (size_t i = 0; i < numAgents; i++)
+				{
 					destination[i] = nullptr;
 					lastDestination[i] = nullptr;
 				}

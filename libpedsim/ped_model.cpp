@@ -187,8 +187,8 @@ void Ped::Model::vector_tick()
 		__m128 desiredY = _mm_load_ps((agentData->desiredY) + i);
 
 		// Set the agent's position to the desired position
-		__m128 x = _mm_round_ps(desiredX, _MM_FROUND_TO_NEAREST_INT);
-		__m128 y = _mm_round_ps(desiredY, _MM_FROUND_TO_NEAREST_INT);
+		__m128 x = desiredX;
+		__m128 y = desiredY;
 
 		_mm_store_ps((agentData->x) + i, x);
 		_mm_store_ps((agentData->y) + i, y);
