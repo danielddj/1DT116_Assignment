@@ -23,17 +23,16 @@
 
 #include <stdlib.h>
 
-
-namespace Ped {
-    std::vector<float> X;
-    std::vector<float> Y;
-    std::vector<float> desiredX;
-    std::vector<float> desiredY;
-    std::vector<float> destinationX;
-    std::vector<float> destinationY;
-    std::vector<float> destinationR;
+namespace Ped
+{
+	std::vector<float> X;
+	std::vector<float> Y;
+	std::vector<float> desiredX;
+	std::vector<float> desiredY;
+	std::vector<float> destinationX;
+	std::vector<float> destinationY;
+	std::vector<float> destinationR;
 }
-
 
 int Ped::Model::numberOfThreads = omp_get_num_threads(); // by default use the number of threads available unless specified otherwise
 
@@ -57,28 +56,34 @@ void Ped::Model::setup(std::vector<Ped::Tagent *> agentsInScenario, std::vector<
 	// Set up heatmap (relevant for Assignment 4)
 	setupHeatmapSeq();
 
-    // Initialize global vectors
-    int num_agents = agents.size();
-    X.resize(num_agents);
-    Y.resize(num_agents);
-    desiredX.resize(num_agents);
-    desiredY.resize(num_agents);	
-    destinationX.resize(num_agents);
-    destinationY.resize(num_agents);
-    destinationR.resize(num_agents);
+	// Initialize global vectors
+	int num_agents = agents.size();
+	X.resize(num_agents);
+	Y.resize(num_agents);
+	desiredX.resize(num_agents);
+	desiredY.resize(num_agents);
+	destinationX.resize(num_agents);
+	destinationY.resize(num_agents);
+	destinationR.resize(num_agents);
 
-    // Populate global vectors with starting data
-    for (int i=0; i<num_agents; ++i) {
-        agents[i]->setID(i); // Set ID for current agent
-        X[i] = agents[i]->getX();		
-        Y[i] = agents[i]->getY();
-        desiredX[i] = agents[i]->getDesiredX();
-        desiredY[i] = agents[i]->getDesiredY();
+	if (implementation == CUDA)
+	{
+		initCudaMemory();
+	}
 
-        // Initialize as null values, to ensure we get new dest at the start
-        destinationX[i] = NAN;
-        destinationY[i] = NAN;
-    }
+	// Populate global vectors with starting data
+	for (int i = 0; i < num_agents; ++i)
+	{
+		agents[i]->setID(i); // Set ID for current agent
+		X[i] = agents[i]->getX();
+		Y[i] = agents[i]->getY();
+		desiredX[i] = agents[i]->getDesiredX();
+		desiredY[i] = agents[i]->getDesiredY();
+
+		// Initialize as null values, to ensure we get new dest at the start
+		destinationX[i] = NAN;
+		destinationY[i] = NAN;
+	}
 }
 
 /*
@@ -139,118 +144,120 @@ void Ped::Model::sequential_tick()
 
 void Ped::Model::vector_tick()
 {
-    int num_agents = agents.size();
-    
-    // Initialize outside of loop, to access it for remaining agents
-    int i=0;
+	int num_agents = agents.size();
 
-    for (; i<= num_agents-4; i += 4) {
-        int num_agents = agents.size();
+	// Initialize outside of loop, to access it for remaining agents
+	int i = 0;
 
-        // Load destination and current position for agents i to i+3
-        __m128 destX = _mm_loadu_ps(&destinationX[i]);
-        __m128 destY = _mm_loadu_ps(&destinationY[i]);
-        __m128 destR = _mm_loadu_ps(&destinationR[i]);
-        __m128 posX = _mm_loadu_ps(&X[i]);
-        __m128 posY = _mm_loadu_ps(&Y[i]);
-    
-        // Check if destinationX, destinationY are null
-        __m128 isNaN_X = _mm_cmpunord_ps(destX, destX);
-        __m128 isNaN_Y = _mm_cmpunord_ps(destY, destY);
-        __m128 isNaN_dest = _mm_or_ps(isNaN_X, isNaN_Y);
-    
-        // Compute difference, destination - current pos
-        __m128 diffX = _mm_sub_ps(destX, posX);
-        __m128 diffY = _mm_sub_ps(destY, posY);
-    
-        // Compute euclidean distance, sqrt(diffX * diffX + diffY * diffY)
-        __m128 len = _mm_sqrt_ps(_mm_add_ps(_mm_mul_ps(diffX, diffX), _mm_mul_ps(diffY, diffY)));
-    
-        // Check if agents reached destination (euclidian distance < R)
-        __m128 reached_dest = _mm_cmplt_ps(len, destR);
-            
-        // Combine conditions (agent has arrived OR destination is NULL)
-        __m128 shouldUpdate = _mm_or_ps(isNaN_dest, reached_dest);
-    
-        // Store results into an array for scalar checks
-        alignas(16) uint32_t update_array[4];
-        _mm_store_si128((__m128i*)update_array, _mm_castps_si128(shouldUpdate));
-    
-        // Call getNextDestination only for agents that meet conditions
-        for (int lane = 0; lane < 4; lane++) {
-            int idx = i + lane;
-            if (update_array[lane] == 0xFFFFFFFF) {
-                agents[idx]->callNextDestination();
-            }
-        }
-    
-        // Update vectors with new values
-        destX = _mm_loadu_ps(&destinationX[i]);
-        destY = _mm_loadu_ps(&destinationY[i]);
-    
-        // Recompute difference (for updated destinations)
-        diffX = _mm_sub_ps(destX, posX);
-        diffY = _mm_sub_ps(destY, posY);
-    
-        // Recompute Euclidean distance
-        len = _mm_sqrt_ps(_mm_add_ps(_mm_mul_ps(diffX, diffX), _mm_mul_ps(diffY, diffY)));
-    
-        // Avoid division by zero (maybe unnecessary?)
-        __m128 mask = _mm_cmpneq_ps(len, _mm_setzero_ps());
-        len = _mm_or_ps(_mm_and_ps(mask, len), _mm_andnot_ps(mask, _mm_set1_ps(1.0f)));
-    
-        // Normalize (diffX / len, diffY / len)
-        __m128 normX = _mm_div_ps(diffX, len);
-        __m128 normY = _mm_div_ps(diffY, len);
-    
-        // New desired position 
-        __m128 newX = _mm_add_ps(posX, normX);
-        __m128 newY = _mm_add_ps(posY, normY);
-    
-        // Rounding
-        __m128 roundedX = _mm_round_ps(newX, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
-        __m128 roundedY = _mm_round_ps(newY, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
-    
-        // Store results
-        _mm_storeu_ps(&desiredX[i], roundedX);
-        _mm_storeu_ps(&desiredY[i], roundedY);
-        
+	for (; i <= num_agents - 4; i += 4)
+	{
+		int num_agents = agents.size();
 
-        // !! We could just store directly on X, Y instead of desiredX, Y
-        // But looks like desired X, Y will be important in later assignments
-        // so maybe keep it like this?
+		// Load destination and current position for agents i to i+3
+		__m128 destX = _mm_loadu_ps(&destinationX[i]);
+		__m128 destY = _mm_loadu_ps(&destinationY[i]);
+		__m128 destR = _mm_loadu_ps(&destinationR[i]);
+		__m128 posX = _mm_loadu_ps(&X[i]);
+		__m128 posY = _mm_loadu_ps(&Y[i]);
 
-        // Store desired positions back into X, Y
-        _mm_store_ps(&X[i], roundedX);
-        _mm_store_ps(&Y[i], roundedY);	
+		// Check if destinationX, destinationY are null
+		__m128 isNaN_X = _mm_cmpunord_ps(destX, destX);
+		__m128 isNaN_Y = _mm_cmpunord_ps(destY, destY);
+		__m128 isNaN_dest = _mm_or_ps(isNaN_X, isNaN_Y);
 
-        /* TESTING ONLY (for visualization) remove for performance */		
-        
-        agents[i]->setX(desiredX[i]);
-        agents[i]->setY(desiredY[i]);
+		// Compute difference, destination - current pos
+		__m128 diffX = _mm_sub_ps(destX, posX);
+		__m128 diffY = _mm_sub_ps(destY, posY);
 
-        agents[i+1]->setX(desiredX[i+1]);
-        agents[i+1]->setY(desiredY[i+1]);
+		// Compute euclidean distance, sqrt(diffX * diffX + diffY * diffY)
+		__m128 len = _mm_sqrt_ps(_mm_add_ps(_mm_mul_ps(diffX, diffX), _mm_mul_ps(diffY, diffY)));
 
-        agents[i+2]->setX(desiredX[i+2]);
-        agents[i+2]->setY(desiredY[i+2]);
+		// Check if agents reached destination (euclidian distance < R)
+		__m128 reached_dest = _mm_cmplt_ps(len, destR);
 
-        agents[i+3]->setX(desiredX[i+3]);
-        agents[i+3]->setY(desiredY[i+3]);		        
+		// Combine conditions (agent has arrived OR destination is NULL)
+		__m128 shouldUpdate = _mm_or_ps(isNaN_dest, reached_dest);
 
-    }
+		// Store results into an array for scalar checks
+		alignas(16) uint32_t update_array[4];
+		_mm_store_si128((__m128i *)update_array, _mm_castps_si128(shouldUpdate));
 
-    // Take care of any leftover loops/agents if num_agents not multiple of 4
-    // Scalar
-    for (; i < num_agents; i++) {
-        agents[i]->computeNextDesiredPosition();
-        X[i] = desiredX[i];
-        Y[i] = desiredY[i];
+		// Call getNextDestination only for agents that meet conditions
+		for (int lane = 0; lane < 4; lane++)
+		{
+			int idx = i + lane;
+			if (update_array[lane] == 0xFFFFFFFF)
+			{
+				agents[idx]->callNextDestination();
+			}
+		}
 
-        // TESTING visualization
-        agents[i]->setX(desiredX[i]);
-        agents[i]->setY(desiredY[i]);
-    }	
+		// Update vectors with new values
+		destX = _mm_loadu_ps(&destinationX[i]);
+		destY = _mm_loadu_ps(&destinationY[i]);
+
+		// Recompute difference (for updated destinations)
+		diffX = _mm_sub_ps(destX, posX);
+		diffY = _mm_sub_ps(destY, posY);
+
+		// Recompute Euclidean distance
+		len = _mm_sqrt_ps(_mm_add_ps(_mm_mul_ps(diffX, diffX), _mm_mul_ps(diffY, diffY)));
+
+		// Avoid division by zero (maybe unnecessary?)
+		__m128 mask = _mm_cmpneq_ps(len, _mm_setzero_ps());
+		len = _mm_or_ps(_mm_and_ps(mask, len), _mm_andnot_ps(mask, _mm_set1_ps(1.0f)));
+
+		// Normalize (diffX / len, diffY / len)
+		__m128 normX = _mm_div_ps(diffX, len);
+		__m128 normY = _mm_div_ps(diffY, len);
+
+		// New desired position
+		__m128 newX = _mm_add_ps(posX, normX);
+		__m128 newY = _mm_add_ps(posY, normY);
+
+		// Rounding
+		__m128 roundedX = _mm_round_ps(newX, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
+		__m128 roundedY = _mm_round_ps(newY, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
+
+		// Store results
+		_mm_storeu_ps(&desiredX[i], roundedX);
+		_mm_storeu_ps(&desiredY[i], roundedY);
+
+		// !! We could just store directly on X, Y instead of desiredX, Y
+		// But looks like desired X, Y will be important in later assignments
+		// so maybe keep it like this?
+
+		// Store desired positions back into X, Y
+		_mm_store_ps(&X[i], roundedX);
+		_mm_store_ps(&Y[i], roundedY);
+
+		/* TESTING ONLY (for visualization) remove for performance */
+
+		agents[i]->setX(desiredX[i]);
+		agents[i]->setY(desiredY[i]);
+
+		agents[i + 1]->setX(desiredX[i + 1]);
+		agents[i + 1]->setY(desiredY[i + 1]);
+
+		agents[i + 2]->setX(desiredX[i + 2]);
+		agents[i + 2]->setY(desiredY[i + 2]);
+
+		agents[i + 3]->setX(desiredX[i + 3]);
+		agents[i + 3]->setY(desiredY[i + 3]);
+	}
+
+	// Take care of any leftover loops/agents if num_agents not multiple of 4
+	// Scalar
+	for (; i < num_agents; i++)
+	{
+		agents[i]->computeNextDesiredPosition();
+		X[i] = desiredX[i];
+		Y[i] = desiredY[i];
+
+		// TESTING visualization
+		agents[i]->setX(desiredX[i]);
+		agents[i]->setY(desiredY[i]);
+	}
 }
 
 void Ped::Model::openmp_tick2()
@@ -405,4 +412,9 @@ Ped::Model::~Model()
 				  { delete agent; });
 	std::for_each(destinations.begin(), destinations.end(), [](Ped::Twaypoint *destination)
 				  { delete destination; });
+
+	if (implementation == CUDA)
+	{
+		freeCudaMemory();
+	}
 }

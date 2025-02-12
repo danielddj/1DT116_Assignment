@@ -48,6 +48,9 @@ namespace Ped
 
 		void vector_tick();
 
+		void initCudaMemory();
+		void freeCudaMemory();
+
 		// tick for openmp implementation
 		void openmp_tick1();
 		void openmp_tick2();
@@ -89,6 +92,13 @@ namespace Ped
 
 		// Moves an agent towards its next position
 		void move(Ped::Tagent *agent);
+
+		float *cuda_X;
+		float *cuda_Y;
+		float *cuda_desiredX;
+		float *cuda_desiredY;
+		float *cuda_destX;
+		float *cuda_destY;
 
 		////////////
 		/// Everything below here won't be relevant until Assignment 3
