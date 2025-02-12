@@ -84,6 +84,7 @@ Ped::Twaypoint* Ped::Tagent::getNextDestination() {
     if (nextDestination != NULL) {
         destinationX[id] = nextDestination->getx();
         destinationY[id] = nextDestination->gety();
+        destinationR[id] = nextDestination->getr();
     } else {
         // Arrived
         destinationX[id] = X[id];

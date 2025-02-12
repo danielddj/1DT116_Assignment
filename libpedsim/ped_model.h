@@ -38,7 +38,7 @@ namespace Ped{
         void sequential_tick();
 
 
-        void computeNextDesiredPosition_SIMD();
+        void computeNextDesiredPosition_SIMD(int i);
 
         void vector_tick();
 

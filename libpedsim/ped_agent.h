@@ -30,6 +30,7 @@ namespace Ped {
     extern std::vector<float> desiredY;
     extern std::vector<float> destinationX;
     extern std::vector<float> destinationY;
+    extern std::vector<float> destinationR;
 
     class Twaypoint;
 
