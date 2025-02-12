@@ -171,12 +171,12 @@ void Ped::Model::computeNextDesiredPosition_SIMD(int i)
 
     // Store results into an array for scalar checks
     alignas(16) uint32_t update_array[4];
-    _mm_store_si128((__m128i*)update_arr, _mm_castps_si128(shouldUpdate));
+    _mm_store_si128((__m128i*)update_array, _mm_castps_si128(shouldUpdate));
 
     // Call getNextDestination only for agents that meet conditions
     for (int lane = 0; lane < 4; lane++) {
         int idx = i + lane;
-        if (update_arr[lane] == 0xFFFFFFFF) {
+        if (update_array[lane] == 0xFFFFFFFF) {
             agents[idx]->callNextDestination();
         }
     }
