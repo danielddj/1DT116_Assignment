@@ -37,9 +37,6 @@ namespace Ped{
         // tick for sequential implementation
         void sequential_tick();
 
-
-        void computeNextDesiredPosition_SIMD(int i);
-
         void vector_tick();
 
         // tick for openmp implementation
