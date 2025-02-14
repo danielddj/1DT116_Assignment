@@ -178,7 +178,7 @@ namespace Ped
                                size_t agentWaypointsPitch, int *waypointIndex, bool serialize, std::ofstream *file)
   {
     // Calculate the number of blocks needed
-    size_t tickCount;
+    size_t tickCount = 0;
 
     int threadsPerBlock = 256;
     int numBlocks = (X.size() + threadsPerBlock - 1) / 256;
@@ -352,6 +352,8 @@ namespace Ped
     cudaStreamDestroy(stream2);
     cudaStreamDestroy(stream3);
     cudaStreamDestroy(stream4);
+
+    printf("%ld", tickCount);
 
     return tickCount;
   }
