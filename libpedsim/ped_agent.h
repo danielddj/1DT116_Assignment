@@ -10,7 +10,7 @@
 // represents the position it would like to visit next as it
 // will bring it closer to its destination.
 // Note: the agent will not move by itself, but the movement
-// is handled in ped_model.cpp. 
+// is handled in ped_model.cpp.
 //
 
 #ifndef _ped_agent_h_
@@ -22,20 +22,21 @@
 
 using namespace std;
 
-namespace Ped {
+namespace Ped
+{
     class Twaypoint;
 
-    class Tagent {
+    class Tagent
+    {
     public:
-
         Tagent(int posX, int posY);
         Tagent(double posX, double posY);
 
         // Initializes with pointers to vectors that store agent data
-        void initialize(int i, 
-            std::vector<float>* X, std::vector<float>* Y, 
-            std::vector<float>* desiredX, std::vector<float>* desiredY,
-            std::vector<float>* destinationX, std::vector<float>* destinationY, std::vector<float>* destinationR);
+        void initialize(int i,
+                        std::vector<float> *X, std::vector<float> *Y,
+                        std::vector<float> *desiredX, std::vector<float> *desiredY,
+                        std::vector<float> *destinationX, std::vector<float> *destinationY, std::vector<float> *destinationR);
 
         // Returns the coordinates of the desired position
         int getDesiredX() const { return desiredPositionX; }
@@ -48,10 +49,10 @@ namespace Ped {
         // Update the position to get closer to the current destination
         void computeNextDesiredPosition();
 
-        // Call getNextDestination() 
+        // Call getNextDestination()
         void callNextDestination();
 
-        //Get agent id
+        // Get agent id
         int getId() const { return id; };
 
         // Position of agent defined by x and y
@@ -59,13 +60,16 @@ namespace Ped {
         int getY() const { return y; };
 
         // Adds a new waypoint to reach for this agent
-        void addWaypoint(Twaypoint* wp);
+        void addWaypoint(Twaypoint *wp);
+
+        // returns all waypoints
+        deque<Twaypoint *> getDestination() { return waypoints; };
 
     private:
         Tagent() {};
 
         // Agent index, for vectors
-        int id; 
+        int id;
 
         // Pointers to vectors
         std::vector<float> *X, *Y;
@@ -81,19 +85,19 @@ namespace Ped {
         int desiredPositionY;
 
         // The current destination (may require several steps to reach)
-        Twaypoint* destination;
+        Twaypoint *destination;
 
         // The last destination
-        Twaypoint* lastDestination;
+        Twaypoint *lastDestination;
 
         // The queue of all destinations that this agent still has to visit
-        deque<Twaypoint*> waypoints;
+        deque<Twaypoint *> waypoints;
 
-        // Internal init function 
+        // Internal init function
         void init(int posX, int posY);
 
         // Returns the next destination to visit
-        Twaypoint* getNextDestination();
+        Twaypoint *getNextDestination();
     };
 }
 
