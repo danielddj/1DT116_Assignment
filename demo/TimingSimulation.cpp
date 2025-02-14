@@ -7,7 +7,7 @@ TimingSimulation::TimingSimulation(Ped::Model &model_, int maxSteps)
 
 void TimingSimulation::runSimulation() {
   if (model.getImplementation() == Ped::CUDA) {
-    tickCounter = model.start_cuda(maxSimulationSteps, false);
+    tickCounter = model.start_cuda(maxSimulationSteps, false, NULL, true);
   } else {
 
     for (int i = 0; i < maxSimulationSteps; i++) {

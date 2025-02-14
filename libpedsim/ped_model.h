@@ -50,7 +50,7 @@ public:
   // tick for c++ thread implementation
   void threads_tick();
   size_t start_cuda(size_t maxSteps, bool serialize,
-                    std::ofstream *file = nullptr);
+                    std::ofstream *file = nullptr, bool timingMode = false);
 
   // Returns the agents of this scenario
   const std::vector<Tagent *> &getAgents() const { return agents; };
@@ -88,7 +88,8 @@ private:
                    float *agentDesY, float *waypointX, float *waypointY,
                    float *waypointR, int *agentWaypoints,
                    size_t agentWaypointsPitch, int *waypointIndex,
-                   bool serialize, std::ofstream *file = nullptr);
+                   bool serialize, std::ofstream *file = nullptr,
+                   bool timingMode = false);
   // The agents in this scenario
   std::vector<Tagent *> agents;
 

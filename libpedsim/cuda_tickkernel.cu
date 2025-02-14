@@ -175,7 +175,7 @@ namespace Ped
 {
   size_t Ped::Model::tick_cuda(size_t ticks, float *d_bufferX1, float *d_bufferX2, float *d_bufferY1, float *d_bufferY2, float *agentDesX, float *agentDesY,
                                float *waypointX, float *waypointY, float *waypointR, int *agentWaypoints,
-                               size_t agentWaypointsPitch, int *waypointIndex, bool serialize, std::ofstream *file)
+                               size_t agentWaypointsPitch, int *waypointIndex, bool serialize, std::ofstream *file, bool timingMode)
   {
     // Calculate the number of blocks needed
     size_t tickCount = 0;
@@ -218,31 +218,33 @@ namespace Ped
 
       // Copy device simulation data to host export buffers.
 
-      if (firstFrame)
+      if (!timingMode)
       {
-        cudaMemcpy(h_exportBufferX, (useBuffer1ForSim ? d_bufferX1 : d_bufferX2), size_agent, cudaMemcpyDeviceToHost);
-        cudaMemcpy(h_exportBufferY, (useBuffer1ForSim ? d_bufferY1 : d_bufferY2), size_agent, cudaMemcpyDeviceToHost);
-        firstFrame = false;
-      }
-      if (useBuffer1ForSim)
-      {
-        cudaMemcpyAsync(h_exportBufferX, d_bufferX1, size_agent, cudaMemcpyDeviceToHost, stream);
-        cudaMemcpyAsync(h_exportBufferY, d_bufferY1, size_agent, cudaMemcpyDeviceToHost, stream);
-      }
-      else
-      {
-        cudaMemcpyAsync(h_exportBufferX, d_bufferX2, size_agent, cudaMemcpyDeviceToHost, stream);
-        cudaMemcpyAsync(h_exportBufferY, d_bufferY2, size_agent, cudaMemcpyDeviceToHost, stream);
-      }
+        if (firstFrame)
+        {
+          cudaMemcpy(h_exportBufferX, (useBuffer1ForSim ? d_bufferX1 : d_bufferX2), size_agent, cudaMemcpyDeviceToHost);
+          cudaMemcpy(h_exportBufferY, (useBuffer1ForSim ? d_bufferY1 : d_bufferY2), size_agent, cudaMemcpyDeviceToHost);
+          firstFrame = false;
+        }
+        if (useBuffer1ForSim)
+        {
+          cudaMemcpyAsync(h_exportBufferX, d_bufferX1, size_agent, cudaMemcpyDeviceToHost, stream);
+          cudaMemcpyAsync(h_exportBufferY, d_bufferY1, size_agent, cudaMemcpyDeviceToHost, stream);
+        }
+        else
+        {
+          cudaMemcpyAsync(h_exportBufferX, d_bufferX2, size_agent, cudaMemcpyDeviceToHost, stream);
+          cudaMemcpyAsync(h_exportBufferY, d_bufferY2, size_agent, cudaMemcpyDeviceToHost, stream);
+        }
 
-      // Now the host export buffers are ready.
-      if (serialize)
-      {
-        serializeDataCuda(h_exportBufferX, h_exportBufferY, *this, *file);
+        // Now the host export buffers are ready.
+        if (serialize)
+        {
+          serializeDataCuda(h_exportBufferX, h_exportBufferY, *this, *file);
+        }
       }
-
-      tickCount++;
       useBuffer1ForSim = !useBuffer1ForSim;
+      tickCount++;
     }
 
     cudaFreeHost(h_exportBufferX);
@@ -251,7 +253,7 @@ namespace Ped
     return tickCount;
   }
 
-  size_t Ped::Model::start_cuda(size_t maxSteps, bool serialize, std::ofstream *file)
+  size_t Ped::Model::start_cuda(size_t maxSteps, bool serialize, std::ofstream *file, bool timingMode)
   {
 
     float *agentStartX, *agentStartY, *agentDesX, *agentDesY, *waypointX, *waypointY, *waypointR;
@@ -329,7 +331,7 @@ namespace Ped
     }
 
     size_t tickCount = tick_cuda(maxSteps, d_bufferX1, d_bufferX2, d_bufferY1, d_bufferY2, agentDesX, agentDesY, waypointX, waypointY, waypointR, agentWaypoints, pitch,
-                                 waypointIndex, serialize, file);
+                                 waypointIndex, serialize, file, timingMode);
 
     // Free allocated memory
     cudaFree(agentStartX);
