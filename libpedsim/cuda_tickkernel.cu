@@ -112,31 +112,20 @@ __device__ void computeNextDesiredPosition(float *d_bufferXSim, float *d_bufferY
   }
 }
 
-//-----------------------------------------------------------------------------
-// CUDA kernel to update agent positions.
-// For each agent i, we do roughly the same as in sequential_tick():
-//   diff = destination - current position
-//   len = sqrt(diff.x*diff.x + diff.y*diff.y)
-//   new position = current position + (diff/len)  (rounded)
-// Then we store the new positions in desiredX/Y and update X/Y.
-//-----------------------------------------------------------------------------
 __global__ void cudaTickKernel(float *d_bufferXSim, float *d_bufferX2Transfer, float *d_bufferYSim,
                                float *d_bufferY2Transfer, float *agentDesX, float *agentDesY,
                                int *agentWaypoints, size_t agentWaypointsPitch, float *waypointX,
                                float *waypointY, float *waypointR, int numAgents, int *waypointIndex,
                                int numWaypoints)
 {
-  // Compute the new desired positions.
   computeNextDesiredPosition(d_bufferXSim, d_bufferYSim, agentDesX, agentDesY, agentWaypoints,
                              agentWaypointsPitch, waypointX, waypointY, waypointR, numAgents, waypointIndex,
                              numWaypoints);
 
   int agentId = blockIdx.x * blockDim.x + threadIdx.x;
 
-  // Ensure we do not exceed the number of agents.
   if (agentId < numAgents)
   {
-    // Copy simulation values to the transfer buffers.
     d_bufferX2Transfer[agentId] = d_bufferXSim[agentId];
     d_bufferY2Transfer[agentId] = d_bufferYSim[agentId];
   }
@@ -255,6 +244,10 @@ namespace Ped
       tickCount++;
       useBuffer1ForSim = !useBuffer1ForSim;
     }
+
+    cudaFreeHost(h_exportBufferX);
+    cudaFreeHost(h_exportBufferY);
+
     return tickCount;
   }
 
@@ -335,8 +328,32 @@ namespace Ped
       std::runtime_error("File needs to be open!");
     }
 
-    return tick_cuda(maxSteps, d_bufferX1, d_bufferX2, d_bufferY1, d_bufferY2, agentDesX, agentDesY, waypointX, waypointY, waypointR, agentWaypoints, pitch,
-                     waypointIndex, serialize, file);
+    size_t tickCount = tick_cuda(maxSteps, d_bufferX1, d_bufferX2, d_bufferY1, d_bufferY2, agentDesX, agentDesY, waypointX, waypointY, waypointR, agentWaypoints, pitch,
+                                 waypointIndex, serialize, file);
+
+    // Free allocated memory
+    cudaFree(agentStartX);
+    cudaFree(agentStartY);
+    cudaFree(agentDesX);
+    cudaFree(agentDesY);
+
+    cudaFree(agentWaypoints);
+    cudaFree(waypointX);
+    cudaFree(waypointY);
+    cudaFree(waypointR);
+    cudaFree(waypointIndex);
+
+    cudaFree(d_bufferX1);
+    cudaFree(d_bufferX2);
+    cudaFree(d_bufferY1);
+    cudaFree(d_bufferY2);
+
+    cudaStreamDestroy(stream1);
+    cudaStreamDestroy(stream2);
+    cudaStreamDestroy(stream3);
+    cudaStreamDestroy(stream4);
+
+    return tickCount;
   }
 
   void Ped::Model::warmup()

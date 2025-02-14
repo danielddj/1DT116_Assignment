@@ -38,11 +38,6 @@ void Ped::Model::setup(std::vector<Ped::Tagent *> agentsInScenario,
   std::cout << "Not compiled for CUDA" << std::endl;
 #endif
 
-  const std::string &filename = "cuda.bin";
-  file = std::ofstream(filename.c_str(), std::ios::binary);
-  int maxSteps = 200;
-  file.write(reinterpret_cast<const char *>(&maxSteps), sizeof(int));
-
   // Set
   agents = std::vector<Ped::Tagent *>(agentsInScenario.begin(),
                                       agentsInScenario.end());
@@ -390,12 +385,4 @@ Ped::Model::~Model() {
   std::for_each(destinations.begin(), destinations.end(),
                 [](Ped::Twaypoint *destination) { delete destination; });
 
-  file.seekp(0, std::ios::beg);
-  int tickCounter = 200;
-  file.write(reinterpret_cast<const char *>(&tickCounter), sizeof(tickCounter));
-  file.close();
-
-  if (implementation == CUDA) {
-    // freeCudaMemory();
-  }
 }
