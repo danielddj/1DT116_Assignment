@@ -184,11 +184,13 @@ void serializeDataCuda(const float *h_exportBufferX, const float *h_exportBuffer
 
 namespace Ped
 {
-  void Ped::Model::tick_cuda(size_t ticks, float *d_bufferX1, float *d_bufferX2, float *d_bufferY1, float *d_bufferY2, float *agentDesX, float *agentDesY,
-                             float *waypointX, float *waypointY, float *waypointR, int *agentWaypoints,
-                             size_t agentWaypointsPitch, int *waypointIndex)
+  size_t Ped::Model::tick_cuda(size_t ticks, float *d_bufferX1, float *d_bufferX2, float *d_bufferY1, float *d_bufferY2, float *agentDesX, float *agentDesY,
+                               float *waypointX, float *waypointY, float *waypointR, int *agentWaypoints,
+                               size_t agentWaypointsPitch, int *waypointIndex, bool serialize, std::ofstream *file)
   {
     // Calculate the number of blocks needed
+    size_t tickCount;
+
     int threadsPerBlock = 256;
     int numBlocks = (X.size() + threadsPerBlock - 1) / 256;
 
@@ -245,13 +247,18 @@ namespace Ped
       }
 
       // Now the host export buffers are ready.
-      // serializeDataCuda(h_exportBufferX, h_exportBufferY, *this, file);
+      if (serialize)
+      {
+        serializeDataCuda(h_exportBufferX, h_exportBufferY, *this, *file);
+      }
 
+      tickCount++;
       useBuffer1ForSim = !useBuffer1ForSim;
     }
+    return tickCount;
   }
 
-  void Ped::Model::start_cuda()
+  size_t Ped::Model::start_cuda(size_t maxSteps, bool serialize, std::ofstream *file)
   {
 
     float *agentStartX, *agentStartY, *agentDesX, *agentDesY, *waypointX, *waypointY, *waypointR;
@@ -323,8 +330,13 @@ namespace Ped
 
     CUDA_CHECK(cudaMemcpyAsync(waypointIndex, waypointIndexTmp, size_agent, cudaMemcpyHostToDevice, stream1));
 
-    tick_cuda(200, d_bufferX1, d_bufferX2, d_bufferY1, d_bufferY2, agentDesX, agentDesY, waypointX, waypointY, waypointR, agentWaypoints, pitch,
-              waypointIndex);
+    if (serialize && !file)
+    {
+      std::runtime_error("File needs to be open!");
+    }
+
+    return tick_cuda(maxSteps, d_bufferX1, d_bufferX2, d_bufferY1, d_bufferY2, agentDesX, agentDesY, waypointX, waypointY, waypointR, agentWaypoints, pitch,
+                     waypointIndex, serialize, file);
   }
 
   void Ped::Model::warmup()

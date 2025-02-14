@@ -54,7 +54,7 @@ void ExportSimulation::serialize() {
 
 void ExportSimulation::runSimulation() {
   if (model.getImplementation() == Ped::CUDA) {
-    model.start_cuda();
+    tickCounter = model.start_cuda(maxSimulationSteps, true, &file);
   } else {
     for (int i = 0; i < maxSimulationSteps; i++) {
       tickCounter++;

@@ -49,7 +49,8 @@ public:
 
   // tick for c++ thread implementation
   void threads_tick();
-  void start_cuda();
+  size_t start_cuda(size_t maxSteps, bool serialize,
+                    std::ofstream *file = nullptr);
 
   // Returns the agents of this scenario
   const std::vector<Tagent *> &getAgents() const { return agents; };
@@ -82,11 +83,12 @@ private:
 
   std::vector<float> X_WP, Y_WP, R_WP; // Waypoint Position
 
-  void tick_cuda(size_t ticks, float *d_bufferX1, float *d_bufferX2,
-                 float *d_bufferY1, float *d_bufferY2, float *agentDesX,
-                 float *agentDesY, float *waypointX, float *waypointY,
-                 float *waypointR, int *agentWaypoints,
-                 size_t agentWaypointsPitch, int *waypointIndex);
+  size_t tick_cuda(size_t ticks, float *d_bufferX1, float *d_bufferX2,
+                   float *d_bufferY1, float *d_bufferY2, float *agentDesX,
+                   float *agentDesY, float *waypointX, float *waypointY,
+                   float *waypointR, int *agentWaypoints,
+                   size_t agentWaypointsPitch, int *waypointIndex,
+                   bool serialize, std::ofstream *file = nullptr);
   // The agents in this scenario
   std::vector<Tagent *> agents;
 
