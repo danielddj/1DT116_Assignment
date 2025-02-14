@@ -68,9 +68,9 @@ namespace Ped {
         int id; 
 
         // Pointers to vectors
-        std::vector<float>* X, Y;
-        std::vector<float>* desiredX, desiredY;
-        std::vector<float>* destinationX, destinationY, destinationR;
+        std::vector<float> *X, *Y;
+        std::vector<float> *desiredX, *desiredY;
+        std::vector<float> *destinationX, *destinationY, *destinationR;
 
         // The agent's current position
         int x;
