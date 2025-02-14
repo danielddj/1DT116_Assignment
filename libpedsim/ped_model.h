@@ -11,10 +11,10 @@
 #ifndef _ped_model_h_
 #define _ped_model_h_
 
-#include <string>
 #include <fstream>
 #include <map>
 #include <set>
+#include <string>
 #include <vector>
 
 #include "ped_agent.h"
@@ -30,10 +30,12 @@ enum IMPLEMENTATION { CUDA, VECTOR, OMP, PTHREAD, SEQ, THREADS };
 class Model {
 public:
   // Sets everything up
-  void setup(std::vector<Tagent *> agentsInScenario, std::vector<Twaypoint *> destinationsInScenario,
+  void setup(std::vector<Tagent *> agentsInScenario,
+             std::vector<Twaypoint *> destinationsInScenario,
              IMPLEMENTATION implementation);
 
-  // Coordinates a time step in the scenario: move all agents by one step (if applicable).
+  // Coordinates a time step in the scenario: move all agents by one step (if
+  // applicable).
   void tick();
 
   // tick for sequential implementation
@@ -65,6 +67,7 @@ public:
 
   static int numberOfThreads;
   IMPLEMENTATION getImplementation() { return implementation; }
+  static void warmup();
 
 private:
   // Denotes which implementation (sequential, parallel implementations..)
@@ -72,15 +75,18 @@ private:
   // agents (Assignment 1)
   IMPLEMENTATION implementation;
 
-  std::vector<float> X, Y;                                     // Position
-  std::vector<float> desiredX, desiredY;                       // Desired movement
-  std::vector<float> destinationX, destinationY, destinationR; // Destination points
+  std::vector<float> X, Y;               // Position
+  std::vector<float> desiredX, desiredY; // Desired movement
+  std::vector<float> destinationX, destinationY,
+      destinationR; // Destination points
 
   std::vector<float> X_WP, Y_WP, R_WP; // Waypoint Position
 
-  void tick_cuda(size_t ticks, float *agentStartX, float *agentStartY, float *agentDesX, float *agentDesY,
-                 float *waypointX, float *waypointY, float *waypointR, int *agentWaypoints, size_t pitch,
-                 int *waypointIndex);
+  void tick_cuda(size_t ticks, float *d_bufferX1, float *d_bufferX2,
+                 float *d_bufferY1, float *d_bufferY2, float *agentDesX,
+                 float *agentDesY, float *waypointX, float *waypointY,
+                 float *waypointR, int *agentWaypoints,
+                 size_t agentWaypointsPitch, int *waypointIndex);
   // The agents in this scenario
   std::vector<Tagent *> agents;
 

@@ -78,33 +78,37 @@ __device__ Twaypoint getNextDestination(const float *agentX, const float *agentY
 
     // Update the waypoint ID to the new one.
     wpID = rowPtr[wpIndex];
+
+    destX = waypointX[wpID];
+    destY = waypointY[wpID];
+    destR = waypointR[wpID];
   }
 
-  // Set the destination using the (possibly updated) waypoint ID.
   dest.x = destX;
   dest.y = destY;
   dest.r = destR;
 
+  // Set the destination using the (possibly updated) waypoint ID.
+
   return dest;
 }
 
-__device__ void computeNextDesiredPosition(float *d_bufferXSim, float *d_bufferYSim, float *agentX, float *agentY,
-                                           float *agentDesX, float *agentDesY, int *agentWaypoints,
+__device__ void computeNextDesiredPosition(float *d_bufferXSim, float *d_bufferYSim, float *agentDesX, float *agentDesY, int *agentWaypoints,
                                            size_t agentWaypointsPitch, float *waypointX, float *waypointY,
                                            float *waypointR, int numAgents, int *waypointIndex, int numWaypoints)
 {
-  getNextDestination(agentX, agentY, agentWaypoints, agentWaypointsPitch, waypointX, waypointY, waypointR, numAgents,
-                     waypointIndex, numWaypoints);
+  Twaypoint dest = getNextDestination(d_bufferXSim, d_bufferYSim, agentWaypoints, agentWaypointsPitch, waypointX, waypointY, waypointR, numAgents,
+                                      waypointIndex, numWaypoints);
 
   int agentId = blockIdx.x * blockDim.x + threadIdx.x;
   if (agentId < numAgents)
   {
-    float diffX = waypointX[agentWaypoints[agentId]] - agentX[agentId];
-    float diffY = waypointY[agentWaypoints[agentId]] - agentY[agentId];
+    float diffX = dest.x - d_bufferXSim[agentId];
+    float diffY = dest.y - d_bufferYSim[agentId];
     float length = sqrt(diffX * diffX + diffY * diffY);
 
-    d_bufferXSim[agentId] = agentX[agentId] + diffX / length;
-    d_bufferYSim[agentId] = agentY[agentId] + diffY / length;
+    d_bufferXSim[agentId] = d_bufferXSim[agentId] + diffX / length;
+    d_bufferYSim[agentId] = d_bufferYSim[agentId] + diffY / length;
   }
 }
 
@@ -116,29 +120,26 @@ __device__ void computeNextDesiredPosition(float *d_bufferXSim, float *d_bufferY
 //   new position = current position + (diff/len)  (rounded)
 // Then we store the new positions in desiredX/Y and update X/Y.
 //-----------------------------------------------------------------------------
-__global__ void cudaTickKernel(float *d_bufferX1Sim, float *d_bufferX2Transfer, float *d_bufferYSim,
-                               float *d_bufferY2Transfer, float *agentX, float *agentY, float *agentDesX,
-                               float *agentDesY, int *agentWaypoints, size_t agentWaypointsPitch, float *waypointX,
+__global__ void cudaTickKernel(float *d_bufferXSim, float *d_bufferX2Transfer, float *d_bufferYSim,
+                               float *d_bufferY2Transfer, float *agentDesX, float *agentDesY,
+                               int *agentWaypoints, size_t agentWaypointsPitch, float *waypointX,
                                float *waypointY, float *waypointR, int numAgents, int *waypointIndex,
                                int numWaypoints)
 {
-  // Compute the new desired positions
-  computeNextDesiredPosition(d_bufferX1Sim, d_bufferYSim, agentX, agentY, agentDesX, agentDesY, agentWaypoints,
+  // Compute the new desired positions.
+  computeNextDesiredPosition(d_bufferXSim, d_bufferYSim, agentDesX, agentDesY, agentWaypoints,
                              agentWaypointsPitch, waypointX, waypointY, waypointR, numAgents, waypointIndex,
                              numWaypoints);
 
-  // Wait for all threads to finish
-  __syncthreads();
+  int agentId = blockIdx.x * blockDim.x + threadIdx.x;
 
-  // Update the agent positions
-  for (int i = 0; i < numAgents; i++)
+  // Ensure we do not exceed the number of agents.
+  if (agentId < numAgents)
   {
-    agentX[i] = d_bufferX1Sim[i];
-    agentY[i] = d_bufferYSim[i];
+    // Copy simulation values to the transfer buffers.
+    d_bufferX2Transfer[agentId] = d_bufferXSim[agentId];
+    d_bufferY2Transfer[agentId] = d_bufferYSim[agentId];
   }
-
-  // Wait for all threads to finish
-  __syncthreads();
 }
 
 void serializeDataCuda(const float *h_exportBufferX, const float *h_exportBufferY, const Ped::Model &model,
@@ -183,7 +184,7 @@ void serializeDataCuda(const float *h_exportBufferX, const float *h_exportBuffer
 
 namespace Ped
 {
-  void Ped::Model::tick_cuda(size_t ticks, float *agentStartX, float *agentStartY, float *agentDesX, float *agentDesY,
+  void Ped::Model::tick_cuda(size_t ticks, float *d_bufferX1, float *d_bufferX2, float *d_bufferY1, float *d_bufferY2, float *agentDesX, float *agentDesY,
                              float *waypointX, float *waypointY, float *waypointR, int *agentWaypoints,
                              size_t agentWaypointsPitch, int *waypointIndex)
   {
@@ -198,52 +199,53 @@ namespace Ped
 
     size_t size_agent = numAgents * sizeof(float);
 
-    float *d_bufferX1 = nullptr, *d_bufferX2 = nullptr, *d_bufferY1 = nullptr, *d_bufferY2 = nullptr;
-    cudaMalloc((void **)&d_bufferX1, size_agent);
-    cudaMalloc((void **)&d_bufferX2, size_agent);
-    cudaMalloc((void **)&d_bufferY1, size_agent);
-    cudaMalloc((void **)&d_bufferY2, size_agent);
-
-    cudaMemset(d_bufferX1, 0, size_agent);
-    cudaMemset(d_bufferX2, 0, size_agent);
-    cudaMemset(d_bufferY1, 0, size_agent);
-    cudaMemset(d_bufferY2, 0, size_agent);
-
     float *h_exportBufferX = nullptr, *h_exportBufferY = nullptr;
     cudaMallocHost((void **)&h_exportBufferX, size_agent);
     cudaMallocHost((void **)&h_exportBufferY, size_agent);
 
     cudaStream_t stream;
     cudaStreamCreate(&stream);
+    bool firstFrame = true;
 
     for (size_t i = 0; i < ticks; i++)
     {
-      // Launch the kernel with 256 threads per block
+      // Launch the kernel with 256 threads per block.
       if (useBuffer1ForSim)
       {
         cudaTickKernel<<<numBlocks, threadsPerBlock>>>(
-            d_bufferX1, d_bufferX2, d_bufferY1, d_bufferY2, agentStartX, agentStartY, agentDesX, agentDesY,
-            agentWaypoints, agentWaypointsPitch, waypointX, waypointY, waypointR, numAgents, waypointIndex, numWaypoints);
+            d_bufferX1, d_bufferX2, d_bufferY1, d_bufferY2, agentDesX, agentDesY,
+            agentWaypoints, agentWaypointsPitch, waypointX, waypointY, waypointR,
+            numAgents, waypointIndex, numWaypoints);
       }
       else
       {
         cudaTickKernel<<<numBlocks, threadsPerBlock>>>(
-            d_bufferX2, d_bufferX1, d_bufferY2, d_bufferY1, agentStartX, agentStartY, agentDesX, agentDesY,
-            agentWaypoints, agentWaypointsPitch, waypointX, waypointY, waypointR, numAgents, waypointIndex, numWaypoints);
+            d_bufferX2, d_bufferX1, d_bufferY2, d_bufferY1, agentDesX, agentDesY,
+            agentWaypoints, agentWaypointsPitch, waypointX, waypointY, waypointR,
+            numAgents, waypointIndex, numWaypoints);
       }
 
-      if (useBuffer1ForSim)
+      // Copy device simulation data to host export buffers.
+
+      if (firstFrame)
       {
-        cudaMemcpyAsync(h_exportBufferX, d_bufferX2, size_agent, cudaMemcpyDeviceToHost, stream);
-        cudaMemcpyAsync(h_exportBufferY, d_bufferY2, size_agent, cudaMemcpyDeviceToHost, stream);
+        cudaMemcpy(h_exportBufferX, (useBuffer1ForSim ? d_bufferX1 : d_bufferX2), size_agent, cudaMemcpyDeviceToHost);
+        cudaMemcpy(h_exportBufferY, (useBuffer1ForSim ? d_bufferY1 : d_bufferY2), size_agent, cudaMemcpyDeviceToHost);
+        firstFrame = false;
       }
-      else
+      if (useBuffer1ForSim)
       {
         cudaMemcpyAsync(h_exportBufferX, d_bufferX1, size_agent, cudaMemcpyDeviceToHost, stream);
         cudaMemcpyAsync(h_exportBufferY, d_bufferY1, size_agent, cudaMemcpyDeviceToHost, stream);
       }
+      else
+      {
+        cudaMemcpyAsync(h_exportBufferX, d_bufferX2, size_agent, cudaMemcpyDeviceToHost, stream);
+        cudaMemcpyAsync(h_exportBufferY, d_bufferY2, size_agent, cudaMemcpyDeviceToHost, stream);
+      }
 
-      serializeDataCuda(h_exportBufferX, h_exportBufferY, *this, file);
+      // Now the host export buffers are ready.
+      // serializeDataCuda(h_exportBufferX, h_exportBufferY, *this, file);
 
       useBuffer1ForSim = !useBuffer1ForSim;
     }
@@ -262,37 +264,55 @@ namespace Ped
     size_t size_waypoint = numWaypoints * sizeof(int);
     size_t pitch;
 
-    CUDA_CHECK(cudaMalloc(&agentStartX, size_agent));
-    CUDA_CHECK(cudaMalloc(&agentStartY, size_agent));
-    CUDA_CHECK(cudaMalloc(&agentDesX, size_agent));
-    CUDA_CHECK(cudaMalloc(&agentDesY, size_agent));
-    CUDA_CHECK(cudaMallocPitch(&agentWaypoints, &pitch, size_waypoint, size_agent));
-    CUDA_CHECK(cudaMalloc(&waypointX, size_agent));
-    CUDA_CHECK(cudaMalloc(&waypointY, size_agent));
-    CUDA_CHECK(cudaMalloc(&waypointR, size_agent));
-    CUDA_CHECK(cudaMalloc(&waypointIndex, size_agent));
+    cudaStream_t stream1, stream2, stream3, stream4;
+    cudaStreamCreate(&stream1);
+    cudaStreamCreate(&stream2);
+    cudaStreamCreate(&stream3);
+    cudaStreamCreate(&stream4);
 
-    CUDA_CHECK(cudaMemcpy(agentStartX, X.data(), size_agent, cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMemcpy(agentStartY, Y.data(), size_agent, cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMemcpy(agentDesX, X.data(), size_agent, cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMemcpy(agentDesY, Y.data(), size_agent, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMallocAsync(&agentStartX, size_agent, stream1));
+    CUDA_CHECK(cudaMallocAsync(&agentStartY, size_agent, stream2));
+    CUDA_CHECK(cudaMallocAsync(&agentDesX, size_agent, stream3))
+    CUDA_CHECK(cudaMallocAsync(&agentDesY, size_agent, stream4));
+    CUDA_CHECK(cudaMallocPitch(&agentWaypoints, &pitch, size_waypoint, size_agent));
+    CUDA_CHECK(cudaMallocAsync(&waypointX, size_agent, stream1));
+    CUDA_CHECK(cudaMallocAsync(&waypointY, size_agent, stream2));
+    CUDA_CHECK(cudaMallocAsync(&waypointR, size_agent, stream3));
+    CUDA_CHECK(cudaMallocAsync(&waypointIndex, size_agent, stream4));
+
+    float *d_bufferX1 = nullptr, *d_bufferX2 = nullptr, *d_bufferY1 = nullptr, *d_bufferY2 = nullptr;
+    cudaMallocAsync((void **)&d_bufferX1, size_agent, stream1);
+    cudaMallocAsync((void **)&d_bufferX2, size_agent, stream2);
+    cudaMallocAsync((void **)&d_bufferY1, size_agent, stream3);
+    cudaMallocAsync((void **)&d_bufferY2, size_agent, stream4);
+
+    CUDA_CHECK(cudaMemcpy(d_bufferX1, X.data(), size_agent, cudaMemcpyHostToDevice));
+    cudaMemset(d_bufferX2, 0, size_agent);
+    CUDA_CHECK(cudaMemcpy(d_bufferY1, Y.data(), size_agent, cudaMemcpyHostToDevice));
+    cudaMemset(d_bufferY2, 0, size_agent);
+
+    CUDA_CHECK(cudaMemset(agentDesX, 0, size_agent));
+    CUDA_CHECK(cudaMemset(agentDesY, 0, size_agent));
 
     int *agentWaypointsTmp = new int[numAgents * numWaypoints];
 
     for (size_t i = 0; i < numAgents; i++)
     {
-      for (size_t j = 0; j < numWaypoints; j++)
+      // Insert the new waypoint at the front and push the rest back
+      for (size_t j = numWaypoints - 1; j > 0; j--)
       {
-        agentWaypointsTmp[i * numWaypoints + j] = agents.at(i)->getDestination().at(j)->getid();
+        agentWaypointsTmp[i * numWaypoints + j] = agents.at(i)->getDestination().at(j - 1)->getid();
       }
+      // Insert the first waypoint at the front
+      agentWaypointsTmp[i * numWaypoints] = agents.at(i)->getDestination().at(numWaypoints - 1)->getid();
     }
 
-    CUDA_CHECK(cudaMemcpy2D(agentWaypoints, pitch, agentWaypointsTmp, size_waypoint, size_waypoint, numAgents,
-                            cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy2DAsync(agentWaypoints, pitch, agentWaypointsTmp, size_waypoint, size_waypoint, numAgents,
+                                 cudaMemcpyHostToDevice, stream1));
 
-    CUDA_CHECK(cudaMemcpy(waypointX, X_WP.data(), size_waypoint, cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMemcpy(waypointY, Y_WP.data(), size_waypoint, cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMemcpy(waypointR, R_WP.data(), size_waypoint, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpyAsync(waypointX, X_WP.data(), size_waypoint, cudaMemcpyHostToDevice, stream2));
+    CUDA_CHECK(cudaMemcpyAsync(waypointY, Y_WP.data(), size_waypoint, cudaMemcpyHostToDevice, stream3));
+    CUDA_CHECK(cudaMemcpyAsync(waypointR, R_WP.data(), size_waypoint, cudaMemcpyHostToDevice, stream4));
 
     int *waypointIndexTmp = new int[numAgents];
 
@@ -301,9 +321,14 @@ namespace Ped
       waypointIndexTmp[i] = agents.at(i)->getDestination().at(0)->getid();
     }
 
-    CUDA_CHECK(cudaMemcpy(waypointIndex, waypointIndexTmp, size_agent, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpyAsync(waypointIndex, waypointIndexTmp, size_agent, cudaMemcpyHostToDevice, stream1));
 
-    tick_cuda(200, agentStartX, agentStartY, agentDesX, agentDesY, waypointX, waypointY, waypointR, agentWaypoints, pitch,
+    tick_cuda(200, d_bufferX1, d_bufferX2, d_bufferY1, d_bufferY2, agentDesX, agentDesY, waypointX, waypointY, waypointR, agentWaypoints, pitch,
               waypointIndex);
+  }
+
+  void Ped::Model::warmup()
+  {
+    cudaFree(0);
   }
 } // namespace Ped
