@@ -126,6 +126,17 @@ private:
 
   void setupHeatmapSeq();
   void updateHeatmapSeq();
+  void resize_vectors();
+  void populate_agent_vectors();
+  void popluate_waypoint_vectors();
+
+  inline __m128 compute_update_mask(__m128 destX, __m128 destY, __m128 destR,
+                                    __m128 posX, __m128 posY);
+  inline void update_agents(int start_idx, __m128 update_mask);
+  inline void compute_new_desired_positions(__m128 posX, __m128 posY,
+                                            __m128 destX, __m128 destY,
+                                            __m128 &newX, __m128 &newY);
+  inline void process_agents_simd(int i);
 };
 } // namespace Ped
 #endif
