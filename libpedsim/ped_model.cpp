@@ -12,10 +12,15 @@
 #include <algorithm>
 #include <omp.h>
 #include <thread>
+#include <mutex>
 #include <cmath>
 #include <vector>
-#include <immintrin.h>
-
+// #include <immintrin.h>
+#define SIMDE_ENABLE_NATIVE_ALIASES
+#include <simde/x86/sse.h>
+#include <simde/x86/sse2.h>
+#include <simde/x86/sse3.h>
+#include "OccupancyGrid.h"
 
 #ifndef NOCDUA
 #include "cuda_testkernel.h"
@@ -23,8 +28,8 @@
 
 #include <stdlib.h>
 
-
-namespace Ped {
+namespace Ped
+{
     std::vector<float> X;
     std::vector<float> Y;
     std::vector<float> desiredX;
@@ -32,10 +37,17 @@ namespace Ped {
     std::vector<float> destinationX;
     std::vector<float> destinationY;
     std::vector<float> destinationR;
+
+    // Global occupancy grid
+    OccupancyGrid globalOccupancyGrid(1024, 1024);
+    // Global mutex for synchronizing access to the occupancy grid.
+    std::mutex gridMutex;
 }
 
-
 int Ped::Model::numberOfThreads = omp_get_num_threads(); // by default use the number of threads available unless specified otherwise
+int Ped::Model::avoidanceAlgorithm;
+
+bool Ped::Model::parralelizeCollisionAvoidance = false;
 
 void Ped::Model::setup(std::vector<Ped::Tagent *> agentsInScenario, std::vector<Twaypoint *> destinationsInScenario, IMPLEMENTATION implementation)
 {
@@ -63,15 +75,16 @@ void Ped::Model::setup(std::vector<Ped::Tagent *> agentsInScenario, std::vector<
     X.resize(num_agents);
     Y.resize(num_agents);
     desiredX.resize(num_agents);
-    desiredY.resize(num_agents);	
+    desiredY.resize(num_agents);
     destinationX.resize(num_agents);
     destinationY.resize(num_agents);
     destinationR.resize(num_agents);
 
     // Populate global vectors with starting data
-    for (int i=0; i<num_agents; ++i) {
+    for (int i = 0; i < num_agents; ++i)
+    {
         agents[i]->setID(i); // Set ID for current agent
-        X[i] = agents[i]->getX();		
+        X[i] = agents[i]->getX();
         Y[i] = agents[i]->getY();
         desiredX[i] = agents[i]->getDesiredX();
         desiredY[i] = agents[i]->getDesiredY();
@@ -79,6 +92,16 @@ void Ped::Model::setup(std::vector<Ped::Tagent *> agentsInScenario, std::vector<
         // Initialize as null values, to ensure we get new dest at the start
         destinationX[i] = NAN;
         destinationY[i] = NAN;
+
+        int region = whichRegion(X[i], Y[i]);
+        agents[i]->setRegion(region);
+        regionAgents[region].push_back(agents[i]);
+    }
+
+    // set up the occupancy grid
+    for (int i = 0; i < num_agents; i++)
+    {
+        globalOccupancyGrid.setOccupied(X[i], Y[i], true);
     }
 }
 
@@ -113,18 +136,36 @@ void Ped::Model::tick()
         std::cout << "CUDA tick not implemented." << std::endl;
         exit(1);
         break;
+    case COLLISION_AVOIDANCE:
+
+        // Choose the collision avoidance algorithm to use
+        if (avoidanceAlgorithm == 1)
+        {
+            // Call the parallelized collision avoidance tick (simple method with global lock grid occupancy)
+            collision_avoidance_tick();
+        }
+        else if (avoidanceAlgorithm == 2)
+        {
+            // Call the parallelized collision avoidance tick (region method)
+            collision_avoidance_tick2();
+        }
+        else if (!parralelizeCollisionAvoidance)
+        {
+            // Call the sequential collision avoidance tick
+            collision_avoidance_tick_seq();
+        }
+        break;
     default:
         std::cout << "Unknown implementation." << std::endl;
         exit(1);
     }
 }
 
-
 void Ped::Model::sequential_tick()
 {
     int num_agents = agents.size();
 
-    for (int i = 0; i<num_agents; ++i)
+    for (int i = 0; i < num_agents; ++i)
     {
         // Compute the next desired position of the agent
         agents[i]->computeNextDesiredPosition();
@@ -132,15 +173,62 @@ void Ped::Model::sequential_tick()
         // Set the agent's position to the desired position
         X[i] = desiredX[i];
         Y[i] = desiredY[i];
-        
-        // TESTING (for visualization)
-        agents[i]->setX(desiredX[i]);
-        agents[i]->setY(desiredY[i]);
 
+        // TESTING (for visualization)
+        // agents[i]->setX(desiredX[i]);
+        // agents[i]->setY(desiredY[i]);
     }
 }
 
-void Ped::Model::computeNextDesiredPosition_SIMD(int i) 
+// runs the simple parallelized version via a global lock grid
+void Ped::Model::collision_avoidance_tick()
+{
+    int num_agents = agents.size();
+    {
+        // Compute desired positions in parallel.
+#pragma omp parallel for
+        for (int i = 0; i < num_agents; ++i)
+        {
+            agents[i]->computeNextDesiredPosition();
+            agents[i]->setDesiredX(desiredX[i]);
+            agents[i]->setDesiredY(desiredY[i]);
+        }
+
+        // Process agents in separate threads.
+        std::thread regionThreads[4];
+        for (int r = 0; r < 4; r++)
+        {
+            regionThreads[r] = std::thread([this, r]()
+                                           {
+                // Make a snapshot of agents in region r.
+                std::vector<Ped::Tagent *> localAgents;
+                {
+                    std::unique_lock<std::mutex> lock(regionMutex[r]);
+                    localAgents = regionAgents[r];
+                }
+
+                // Process each agent using our grid-based move.
+                for (auto agent : localAgents)
+                {
+                    move_parallelized(agent);
+                } });
+        }
+        for (int r = 0; r < 4; r++)
+        {
+            regionThreads[r].join();
+        }
+
+        // Update global positions.
+#pragma omp parallel for
+        for (int i = 0; i < num_agents; ++i)
+        {
+            X[i] = agents[i]->getX();
+            Y[i] = agents[i]->getY();
+        }
+    }
+}
+
+void Ped::Model::computeNextDesiredPosition_SIMD(int i)
 {
     int num_agents = agents.size();
 
@@ -165,18 +253,20 @@ void Ped::Model::computeNextDesiredPosition_SIMD(int i)
 
     // Check if agents reached destination (euclidian distance < R)
     __m128 reached_dest = _mm_cmplt_ps(len, destR);
-        
+
     // Combine conditions (agent has arrived OR destination is NULL)
     __m128 shouldUpdate = _mm_or_ps(isNaN_dest, reached_dest);
 
     // Store results into an array for scalar checks
     alignas(16) uint32_t update_array[4];
-    _mm_store_si128((__m128i*)update_arr, _mm_castps_si128(shouldUpdate));
+    _mm_store_si128((__m128i *)update_array, _mm_castps_si128(shouldUpdate));
 
     // Call getNextDestination only for agents that meet conditions
-    for (int lane = 0; lane < 4; lane++) {
+    for (int lane = 0; lane < 4; lane++)
+    {
         int idx = i + lane;
-        if (update_arr[lane] == 0xFFFFFFFF) {
+        if (update_array[lane] == 0xFFFFFFFF)
+        {
             agents[idx]->callNextDestination();
         }
     }
@@ -200,29 +290,28 @@ void Ped::Model::computeNextDesiredPosition_SIMD(int i)
     __m128 normX = _mm_div_ps(diffX, len);
     __m128 normY = _mm_div_ps(diffY, len);
 
-    // New desired position 
+    // New desired position
     __m128 newX = _mm_add_ps(posX, normX);
     __m128 newY = _mm_add_ps(posY, normY);
 
     // Rounding
-    __m128 roundedX = _mm_round_ps(newX, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
-    __m128 roundedY = _mm_round_ps(newY, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
+    __m128 roundedX = _mm_round_ps(newX, SIMDE_MM_FROUND_TO_NEAREST_INT);
+    __m128 roundedY = _mm_round_ps(newY, SIMDE_MM_FROUND_TO_NEAREST_INT);
 
     // Store results
     _mm_storeu_ps(&desiredX[i], roundedX);
     _mm_storeu_ps(&desiredY[i], roundedY);
-    
 }
-
 
 void Ped::Model::vector_tick()
 {
     int num_agents = agents.size();
-    
-    // Initialize outside of loop, to access it for remaining agents
-    int i=0;
 
-    for (; i<= num_agents-4; i += 4) {
+    // Initialize outside of loop, to access it for remaining agents
+    int i = 0;
+
+    for (; i <= num_agents - 4; i += 4)
+    {
 
         // Compute next desired position and store in desiredX, desiredY
         computeNextDesiredPosition_SIMD(i);
@@ -233,9 +322,9 @@ void Ped::Model::vector_tick()
 
         // Store desired positions back into X, Y
         _mm_store_ps(&X[i], next_x);
-        _mm_store_ps(&Y[i], next_y);	
+        _mm_store_ps(&Y[i], next_y);
 
-        /* TESTING ONLY (for visualization) remove for performance */		
+        /* TESTING ONLY (for visualization) remove for performance */
         /*
         agents[i]->setX(desiredX[i]);
         agents[i]->setY(desiredY[i]);
@@ -247,14 +336,14 @@ void Ped::Model::vector_tick()
         agents[i+2]->setY(desiredY[i+2]);
 
         agents[i+3]->setX(desiredX[i+3]);
-        agents[i+3]->setY(desiredY[i+3]);		
+        agents[i+3]->setY(desiredY[i+3]);
         */
-
     }
 
     // Take care of any leftover loops/agents if num_agents not multiple of 4
     // Scalar
-    for (; i < num_agents; i++) {
+    for (; i < num_agents; i++)
+    {
         agents[i]->computeNextDesiredPosition();
         X[i] = desiredX[i];
         Y[i] = desiredY[i];
@@ -262,7 +351,7 @@ void Ped::Model::vector_tick()
         // TESTING visualization
         agents[i]->setX(desiredX[i]);
         agents[i]->setY(desiredY[i]);
-    }	
+    }
 }
 
 void Ped::Model::openmp_tick2()
@@ -330,7 +419,6 @@ void Ped::Model::threads_tick()
     }
 }
 
-
 ////////////
 /// Everything below here relevant for Assignment 3.
 /// Don't use this for Assignment 1!
@@ -392,6 +480,65 @@ void Ped::Model::move(Ped::Tagent *agent)
     }
 }
 
+// Helper function based on the original move function
+std::vector<std::pair<int, int>> computePrioritizedPositions(Ped::Tagent *agent, std::pair<int, int> pDesired)
+{
+    std::vector<std::pair<int, int>> prioritizedAlternatives;
+    // std::pair<int, int> pDesired(agent->getDesiredX(), agent->getDesiredY());
+    prioritizedAlternatives.push_back(pDesired);
+
+    int diffX = pDesired.first - agent->getX();
+    int diffY = pDesired.second - agent->getY();
+    std::pair<int, int> p1, p2;
+    if (diffX == 0 || diffY == 0)
+    {
+        // Agent wants to walk straight to North, South, West or East
+        p1 = std::make_pair(pDesired.first + diffY, pDesired.second + diffX);
+        p2 = std::make_pair(pDesired.first - diffY, pDesired.second - diffX);
+    }
+    else
+    {
+        // Agent wants to walk diagonally
+        p1 = std::make_pair(pDesired.first, agent->getY());
+        p2 = std::make_pair(agent->getX(), pDesired.second);
+    }
+    prioritizedAlternatives.push_back(p1);
+    prioritizedAlternatives.push_back(p2);
+
+    return prioritizedAlternatives;
+}
+
+// Moves the agent to the next desired position. If already taken, it will
+// be moved to a location close to it.
+// This version uses a global lock grid approach to avoid collisions parallely.
+void Ped::Model::move_parallelized(Ped::Tagent *agent)
+{
+    // Compute candidate positions based on desired position.
+    std::pair<int, int> pDesired(agent->getDesiredX(), agent->getDesiredY());
+    std::vector<std::pair<int, int>> candidates = computePrioritizedPositions(agent, pDesired);
+
+    for (auto &candidate : candidates)
+    {
+        // Lock the grid for an atomic check-and-update
+        std::unique_lock<std::mutex> lock(gridMutex);
+
+        if (!globalOccupancyGrid.isOccupied(candidate.first, candidate.second))
+        {
+            // Claim the candidate cell
+            globalOccupancyGrid.setOccupied(candidate.first, candidate.second, true);
+            // Free the agent's previous cell
+            globalOccupancyGrid.setOccupied(agent->getX(), agent->getY(), false);
+            // Unlock before updating the agent
+            lock.unlock();
+            // Update the agent's position.
+            agent->setX(candidate.first);
+            agent->setY(candidate.second);
+
+            break;
+        }
+    }
+}
+
 /// Returns the list of neighbors within dist of the point x/y. This
 /// can be the position of an agent, but it is not limited to this.
 /// \date    2012-01-29
@@ -407,6 +554,19 @@ set<const Ped::Tagent *> Ped::Model::getNeighbors(int x, int y, int dist) const
     return set<const Ped::Tagent *>(agents.begin(), agents.end());
 }
 
+// Removes the agent from the region specified
+void Ped::Model::removeFromRegion(Ped::Tagent *agent, int oldRegion)
+{
+    auto &vec = regionAgents[oldRegion];
+    vec.erase(std::remove(vec.begin(), vec.end(), agent), vec.end());
+}
+
+// Adds the agent to the region specified
+void Ped::Model::addToRegion(Ped::Tagent *agent, int newRegion)
+{
+    regionAgents[newRegion].push_back(agent);
+}
+
 void Ped::Model::cleanup()
 {
     // Nothing to do here right now.
@@ -418,4 +578,161 @@ Ped::Model::~Model()
                   { delete agent; });
     std::for_each(destinations.begin(), destinations.end(), [](Ped::Twaypoint *destination)
                   { delete destination; });
+}
+
+// Assigns a region to the agent based on its coordinates
+int Ped::Model::whichRegion(float x, float y)
+{
+    // the hard coded values are based on the default scenario atm, should be changed if the scenario changes. Maybe determine based on the average position of the agents? Works for now.
+    int region = 0;
+    if (x > 80)
+    {
+        if (y > 60)
+        {
+            region = 0;
+        }
+        else
+        {
+            region = 3;
+        }
+    }
+    else
+    {
+        if (y > 60)
+        {
+            region = 1;
+        }
+        else
+        {
+            region = 2;
+        }
+    }
+    return region;
+}
+
+// Moves the agent to the next desired position. If already taken, it will
+// be moved to a location close to it.
+// This version uses a region-based approach to avoid collisions parallely.
+void Ped::Model::move_parallelized2(Ped::Tagent *agent)
+{
+    // Determine current region.
+    int oldRegion = whichRegion(agent->getX(), agent->getY());
+    // Compute candidate positions based on desired position.
+    std::pair<int, int> pDesired(agent->getDesiredX(), agent->getDesiredY());
+    std::vector<std::pair<int, int>> candidates = computePrioritizedPositions(agent, pDesired);
+
+    for (auto &candidate : candidates)
+    {
+        // see if the candidate is in the same region as the agent
+        int newRegion = whichRegion(candidate.first, candidate.second);
+        if (newRegion == oldRegion)
+        {
+            // Intra-region move: no inter-region locks needed -> Sequential
+            // Since the region thread has exclusive access, we can check and update
+            // the occupancy grid for cells belonging to this region without locking.
+            if (!globalOccupancyGrid.isOccupied(candidate.first, candidate.second))
+            {
+                // Update grid: claim new cell and free old cell.
+                globalOccupancyGrid.setOccupied(candidate.first, candidate.second, true);
+                globalOccupancyGrid.setOccupied(agent->getX(), agent->getY(), false);
+                // Update the agent's position.
+                agent->setX(candidate.first);
+                agent->setY(candidate.second);
+                break;
+            }
+        }
+        else
+        {
+            // --- Cross-region move: need to update region ownership.
+            // Acquire locks for both regions in a fixed order
+            int firstLock = std::min(oldRegion, newRegion);
+            int secondLock = std::max(oldRegion, newRegion);
+            std::scoped_lock lock(regionMutex[firstLock], regionMutex[secondLock]); // only for C++17 and later guys
+
+            // Double-check that the candidate cell is free.
+            if (!globalOccupancyGrid.isOccupied(candidate.first, candidate.second))
+            {
+                // Update grid: claim the candidate and free the old cell.
+                globalOccupancyGrid.setOccupied(candidate.first, candidate.second, true);
+                globalOccupancyGrid.setOccupied(agent->getX(), agent->getY(), false);
+
+                // Transfer agent between regions.
+                removeFromRegion(agent, oldRegion);
+                addToRegion(agent, newRegion);
+
+                // Update the agent's position.
+                agent->setX(candidate.first);
+                agent->setY(candidate.second);
+                break;
+            }
+        }
+    }
+}
+
+void Ped::Model::collision_avoidance_tick_seq()
+{
+
+    int num_agents = agents.size();
+
+    if (!parralelizeCollisionAvoidance)
+    {
+        for (int i = 0; i < num_agents; ++i)
+        {
+            agents[i]->computeNextDesiredPosition();
+            agents[i]->setDesiredX(desiredX[i]);
+            agents[i]->setDesiredY(desiredY[i]);
+            move(agents[i]);
+            X[i] = agents[i]->getX();
+            Y[i] = agents[i]->getY();
+        }
+    }
+}
+
+// runs the region-based collision avoidance algorithm
+void Ped::Model::collision_avoidance_tick2()
+{
+    int num_agents = agents.size();
+    {
+        // Compute desired positions in parallel.
+#pragma omp parallel for
+        for (int i = 0; i < num_agents; ++i)
+        {
+            agents[i]->computeNextDesiredPosition();
+            agents[i]->setDesiredX(desiredX[i]);
+            agents[i]->setDesiredY(desiredY[i]);
+        }
+
+        // Process agents by region in separate threads.
+        std::thread regionThreads[4];
+        for (int r = 0; r < 4; r++)
+        {
+            regionThreads[r] = std::thread([this, r]()
+            {
+            // Make a snapshot of agents in region r.
+            std::vector<Ped::Tagent *> localAgents;
+            {
+                std::unique_lock<std::mutex> lock(regionMutex[r]);
+                localAgents = regionAgents[r];
+            }
+
+            // Process each agent using our region‐based move.
+            for (auto agent : localAgents)
+            {
+                move_parallelized2(agent);
+            } });
+        }
+
+        for (int r = 0; r < 4; r++)
+        {
+            regionThreads[r].join();
+        }
+
+        // Update global positions.
+#pragma omp parallel for
+        for (int i = 0; i < num_agents; ++i)
+        {
+            X[i] = agents[i]->getX();
+            Y[i] = agents[i]->getY();
+        }
+    }
 }

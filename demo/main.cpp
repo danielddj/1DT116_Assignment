@@ -77,6 +77,7 @@ int main(int argc, char *argv[])
             {"pthread", no_argument, NULL, 'p'},
             {"seq", no_argument, NULL, 'q'},
             {"threads", optional_argument, NULL, 'T'},
+            {"collision_avoidance", optional_argument, NULL, 'a'},
             {0, 0, 0, 0} // End of options
         };
 
@@ -140,6 +141,29 @@ int main(int argc, char *argv[])
                 std::cout << "Option --omp activated\n";
             }
             implementation_to_test = Ped::OMP;
+            break;
+        case 'a':
+            // Handle --collision_avoidance
+            implementation_to_test = Ped::COLLISION_AVOIDANCE;
+            if (optarg != NULL)
+            {
+                Ped::Model::parralelizeCollisionAvoidance = true;
+                Ped::Model::avoidanceAlgorithm = std::stoi(optarg);
+                std::cout << "Option --collision_avoidance with parallelization" << std::endl;
+                if (Ped::Model::avoidanceAlgorithm == 1)
+                {
+                    std::cout << "Option --collision_avoidance with algorithm 1: simple" << std::endl;
+                }
+                else if (Ped::Model::avoidanceAlgorithm == 2)
+                {
+                    std::cout << "Option --collision_avoidance with algorithm 2: regions" << std::endl;
+                }
+            }
+            else
+            {
+                // If no argument is provided use the default number of threads
+                std::cout << "Option --collision_avoidance activated\n";
+            }
             break;
         case 'T':
             // Handle --threads

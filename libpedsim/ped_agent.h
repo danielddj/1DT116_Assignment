@@ -18,7 +18,12 @@
 
 #include <vector>
 #include <deque>
-#include <immintrin.h>
+//#include <immintrin.h>
+#define SIMDE_ENABLE_NATIVE_ALIASES
+#include <simde/x86/sse.h>
+#include <simde/x86/sse2.h>
+#include <simde/x86/sse3.h>
+#include <set>
 
 using namespace std;
 
@@ -44,6 +49,9 @@ namespace Ped {
         int getDesiredX() const { return desiredPositionX; }
         int getDesiredY() const { return desiredPositionY; }
 
+        void setDesiredX(int x) { desiredPositionX = x; }
+        void setDesiredY(int y) { desiredPositionY = y; }
+
         // Sets the agent's position
         void setX(int newX) { x = newX; }
         void setY(int newY) { y = newY; }
@@ -61,6 +69,17 @@ namespace Ped {
         //Get agent id
         int getId() const { return id; };
 
+        void setRegion(int region) { regionIndex = region; };
+        int getRegion() const { return regionIndex; };
+        const std::set<const Tagent*>& getCachedNeighbors() const {    
+            return cachedNeighbors;
+        }
+
+        void setCachedNeighbors(const std::set<const Tagent*>& neighbors) { 
+            cachedNeighbors = neighbors;
+        }
+
+
         // Position of agent defined by x and y
         int getX() const { return x; };
         int getY() const { return y; };
@@ -77,12 +96,18 @@ namespace Ped {
         int x;
         int y;
 
+        int regionIndex;
+
         // The agent's desired next position
         int desiredPositionX;
         int desiredPositionY;
 
         // The current destination (may require several steps to reach)
         Twaypoint* destination;
+
+        // cached neighbors
+        std::set<const Tagent*> cachedNeighbors;
+
 
         // The last destination
         Twaypoint* lastDestination;
