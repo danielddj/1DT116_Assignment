@@ -96,16 +96,18 @@ void Ped::Model::tick() {
   case VECTOR:
     vector_tick();
     break;
+  case REGION:
+    break;
   default:
     std::cout << "Unknown implementation." << std::endl;
     exit(1);
   }
 
-  /*   for (int i = 0; i < agents.size(); ++i) {
+    for (int i = 0; i < agents.size(); ++i) {
       // TESTING (for visualization)
       agents[i]->setX(desiredX[i]);
       agents[i]->setY(desiredY[i]);
-    } */
+    }
 }
 
 void Ped::Model::sequential_tick() {
@@ -115,7 +117,6 @@ void Ped::Model::sequential_tick() {
     // Compute the next desired position of the agent
     agents[i]->computeNextDesiredPosition();
 
-    // Set the agent's position to the desired position
     move(agents[i]);
   }
 }
@@ -207,24 +208,26 @@ void Ped::Model::threads_tick() {
 void Ped::Model::move(Ped::Tagent *agent) {
   // Search for neighboring agents
   set<const Ped::Tagent *> neighbors =
-      getNeighbors(agent->getX(), agent->getY(), 2);
+      getNeighbors(X[agent->getId()], Y[agent->getId()], 2);
 
   // Retrieve their positions
   std::vector<std::pair<int, int>> takenPositions;
   for (std::set<const Ped::Tagent *>::iterator neighborIt = neighbors.begin();
        neighborIt != neighbors.end(); ++neighborIt) {
-    std::pair<int, int> position((*neighborIt)->getX(), (*neighborIt)->getY());
+    std::pair<int, int> position(X[(*neighborIt)->getId()],
+                                 Y[(*neighborIt)->getId()]);
     takenPositions.push_back(position);
   }
 
   // Compute the three alternative positions that would bring the agent
   // closer to his desiredPosition, starting with the desiredPosition itself
   std::vector<std::pair<int, int>> prioritizedAlternatives;
-  std::pair<int, int> pDesired(agent->getDesiredX(), agent->getDesiredY());
+  std::pair<int, int> pDesired(desiredX[agent->getId()],
+                               desiredY[agent->getId()]);
   prioritizedAlternatives.push_back(pDesired);
 
-  int diffX = pDesired.first - agent->getX();
-  int diffY = pDesired.second - agent->getY();
+  int diffX = pDesired.first - X[agent->getId()];
+  int diffY = pDesired.second - Y[agent->getId()];
   std::pair<int, int> p1, p2;
   if (diffX == 0 || diffY == 0) {
     // Agent wants to walk straight to North, South, West or East
@@ -232,8 +235,8 @@ void Ped::Model::move(Ped::Tagent *agent) {
     p2 = std::make_pair(pDesired.first - diffY, pDesired.second - diffX);
   } else {
     // Agent wants to walk diagonally
-    p1 = std::make_pair(pDesired.first, agent->getY());
-    p2 = std::make_pair(agent->getX(), pDesired.second);
+    p1 = std::make_pair(pDesired.first, Y[agent->getId()]);
+    p2 = std::make_pair(X[agent->getId()], pDesired.second);
   }
   prioritizedAlternatives.push_back(p1);
   prioritizedAlternatives.push_back(p2);
@@ -248,8 +251,9 @@ void Ped::Model::move(Ped::Tagent *agent) {
         takenPositions.end()) {
 
       // Set the agent's position
-      agent->setX((*it).first);
-      agent->setY((*it).second);
+
+      X[agent->getId()] = (*it).first;
+      Y[agent->getId()] = (*it).second;
 
       break;
     }
@@ -285,7 +289,6 @@ Ped::Model::~Model() {
 }
 
 void Ped::Model::init_region() {
-  // --- New region system initialization ---
   if (implementation == REGION) {
     Ped::Region_handler *handler =
         new Region_handler(4, true, 160, 120, 100, 0, agents);
