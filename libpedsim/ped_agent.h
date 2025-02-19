@@ -16,89 +16,90 @@
 #ifndef _ped_agent_h_
 #define _ped_agent_h_ 1
 
-#include <vector>
+#include <atomic>
 #include <deque>
 #include <immintrin.h>
+#include <vector>
 
 using namespace std;
 
-namespace Ped
-{
-    class Twaypoint;
+namespace Ped {
+class Twaypoint;
 
-    class Tagent
-    {
-    public:
-        Tagent(int posX, int posY);
-        Tagent(double posX, double posY);
+class Tagent {
+public:
+  std::atomic<bool> isMoving{false};
+  Tagent(int posX, int posY);
+  Tagent(double posX, double posY);
 
-        // Initializes with pointers to vectors that store agent data
-        void initialize(int i,
-                        std::vector<float> *X, std::vector<float> *Y,
-                        std::vector<float> *desiredX, std::vector<float> *desiredY,
-                        std::vector<float> *destinationX, std::vector<float> *destinationY, std::vector<float> *destinationR);
+  // Initializes with pointers to vectors that store agent data
+  void initialize(int i, std::vector<float> *X, std::vector<float> *Y,
+                  std::vector<float> *desiredX, std::vector<float> *desiredY,
+                  std::vector<float> *destinationX,
+                  std::vector<float> *destinationY,
+                  std::vector<float> *destinationR);
 
-        // Returns the coordinates of the desired position
-        int getDesiredX() const { return desiredPositionX; }
-        int getDesiredY() const { return desiredPositionY; }
+  // Returns the coordinates of the desired position
+  int getDesiredX() const { return desiredPositionX; }
+  int getDesiredY() const { return desiredPositionY; }
 
-        // Sets the agent's position
-        void setX(int newX) { x = newX; }
-        void setY(int newY) { y = newY; }
+  // Sets the agent's position
+  void setX(int newX) { x = newX; }
+  void setY(int newY) { y = newY; }
 
-        // Update the position to get closer to the current destination
-        void computeNextDesiredPosition();
+  // Update the position to get closer to the current destination
+  void computeNextDesiredPosition();
 
-        // Call getNextDestination()
-        void callNextDestination();
+  // Call getNextDestination()
+  void callNextDestination();
 
-        // Get agent id
-        int getId() const { return id; };
+  // Get agent id
+  int getId() const { return id; };
 
-        // Position of agent defined by x and y
-        int getX() const { return x; };
-        int getY() const { return y; };
+  // Position of agent defined by x and y
+  int getX() const { return x; };
+  int getY() const { return y; };
 
-        // Adds a new waypoint to reach for this agent
-        void addWaypoint(Twaypoint *wp);
+  // Adds a new waypoint to reach for this agent
+  void addWaypoint(Twaypoint *wp);
 
-        // returns all waypoints
-        deque<Twaypoint *> getDestination() { return waypoints; };
+  // returns all waypoints
+  deque<Twaypoint *> getDestination() { return waypoints; };
 
-    private:
-        Tagent() {};
+private:
+  Tagent(){};
 
-        // Agent index, for vectors
-        int id;
+  // Agent index, for vectors
+  int id;
 
-        // Pointers to vectors
-        std::vector<float> *X, *Y;
-        std::vector<float> *desiredX, *desiredY;
-        std::vector<float> *destinationX, *destinationY, *destinationR;
+  // Pointers to vectors
+  std::vector<float> *X, *Y;
+  std::vector<float> *desiredX, *desiredY;
+  std::vector<float> *destinationX, *destinationY, *destinationR;
 
-        // The agent's current position
-        int x;
-        int y;
+  // The agent's current position
+  int x;
+  int y;
 
-        // The agent's desired next position
-        int desiredPositionX;
-        int desiredPositionY;
+  // The agent's desired next position
+  int desiredPositionX;
+  int desiredPositionY;
 
-        // The current destination (may require several steps to reach)
-        Twaypoint *destination;
+  // The current destination (may require several steps to reach)
+  Twaypoint *destination;
 
-        // The last destination
-        Twaypoint *lastDestination;
+  // The last destination
+  Twaypoint *lastDestination;
 
-        // The queue of all destinations that this agent still has to visit
-        deque<Twaypoint *> waypoints;
+  // The queue of all destinations that this agent still has to visit
+  deque<Twaypoint *> waypoints;
 
-        // Internal init function
-        void init(int posX, int posY);
+  // Internal init function
+  void init(int posX, int posY);
 
-        // Returns the next destination to visit
-        Twaypoint *getNextDestination();
-    };
-}
+  // Returns the next destination to visit
+  Twaypoint *getNextDestination();
+};
+} // namespace Ped
 
 #endif

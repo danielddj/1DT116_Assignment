@@ -73,6 +73,7 @@ public:
 
   // Moves an agent towards its next position
   void move(Ped::Tagent *agent);
+  bool safeMove(Ped::Tagent *agent);
 
 private:
   // Denotes which implementation (sequential, parallel implementations..)

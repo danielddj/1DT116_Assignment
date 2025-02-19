@@ -3,7 +3,7 @@
 #include "ped_model.h"
 #include <vector>
 
-namespace Ped {
+namespace Ped {}
 
 // Check if a point (x,y) is in this region.
 bool Ped::Region::contains(Ped::Tagent *agent) const {
@@ -73,7 +73,7 @@ bool Ped::Region::removeAgent(Ped::Tagent *agent) {
   return false;
 }
 
-void Ped::Region::transfer_agents(TargetRegionFunc targetForAgent) {
+void Ped::Region::transfer_agents(Ped::Region_handler *handler) {
   AgentNode *curr =
       agent_list_head.exchange(nullptr, std::memory_order_acquire);
   agentCount.store(0, std::memory_order_relaxed);
@@ -81,7 +81,7 @@ void Ped::Region::transfer_agents(TargetRegionFunc targetForAgent) {
   while (curr) {
     AgentNode *next = curr->next.load(std::memory_order_acquire);
 
-    Region *target = targetForAgent(curr->agent);
+    Region *target = handler->next_region_for_agent(curr->agent);
     if (target) {
       target->addAgent(curr->agent);
     }
@@ -91,7 +91,7 @@ void Ped::Region::transfer_agents(TargetRegionFunc targetForAgent) {
   }
 }
 
-void Ped::Region::move_agents(Ped::Model *model) {
+void Ped::Region::move_agents(Ped::Model *model, Ped::Region_handler *handler) {
   AgentNode *curr = agent_list_head;
   while (curr) {
     curr->agent.load()->computeNextDesiredPosition();
@@ -100,8 +100,9 @@ void Ped::Region::move_agents(Ped::Model *model) {
       model->move(curr->agent);
       curr = curr->next;
     } else {
+      transfer_agents(handler);
+
+      model->safeMove(curr->agent.load());
     }
   }
 }
-
-} // namespace Ped

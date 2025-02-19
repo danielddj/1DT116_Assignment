@@ -1,4 +1,5 @@
-#include "ped_region_handler.h"
+#include "ped_regionhandler.h"
+#include "ped_region.h"
 #include <iostream>
 #include <math.h>
 
@@ -46,13 +47,26 @@ void Region_handler::valid_region_count(size_t start_regions) {
 
 void Region_handler::resize_regions() {}
 
-void Region_handler::tick_regions(Ped::Model *model) {
-#pragma omp parallel num_threads(numberOfThreads) shared(agents)
+Region *Region_handler::next_region_for_agent(Tagent *agent) {
+
+  for (auto &region : regions) {
+    if (region->contains_desired(agent)) {
+      return region;
+    }
+  }
+
+  return nullptr;
+}
+
+void Region_handler::tick_regions(Model *model) {
+
+  std::vector<Ped::Tagent *> agents = model->getAgents();
+#pragma omp parallel num_threads(4) shared(agents)
   {
 // perform the tick operation for all agents
 #pragma omp for schedule(static)
     for (auto &region : regions) {
-      region->move_agents(model);
+      region->move_agents(model, this);
     }
   }
 }
@@ -61,5 +75,4 @@ void Region_handler::add_region(size_t x, size_t y, size_t width,
                                 size_t height) {
   regions.push_back(new Region(x, y, width, height));
 }
-
 } // namespace Ped

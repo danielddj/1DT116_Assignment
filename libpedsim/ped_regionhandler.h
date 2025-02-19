@@ -1,18 +1,24 @@
+#ifndef _ped_regionhandler_h_
+#define _ped_regionhandler_h_
+
+#include "ped_agent.h"
 #include "ped_region.h"
 #include <vector>
 
 namespace Ped {
+class Region;
 class Region_handler {
+
 public:
   Region_handler(size_t start_regions, bool resize, size_t max_x, size_t max_y,
                  size_t max_agents, size_t min_agents);
   ~Region_handler();
 
-  std::vector<Region *> regions;
+  std::vector<Ped::Region *> regions;
+
+  Ped::Region *next_region_for_agent(Ped::Tagent *agent);
 
 protected:
-  Ped::Region *get_region_for_agent();
-
 private:
   size_t max_x, max_y, max_agents, min_agents;
   bool dynamic_resize;
@@ -23,3 +29,5 @@ private:
 };
 
 } // namespace Ped
+
+#endif

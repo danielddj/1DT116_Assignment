@@ -115,8 +115,6 @@ void Ped::Model::sequential_tick() {
   }
 }
 
-
-
 // The refactored vector_tick() function.
 void Ped::Model::vector_tick() {
   const int num_agents = static_cast<int>(agents.size());
@@ -200,6 +198,25 @@ void Ped::Model::threads_tick() {
 
 // Moves the agent to the next desired position. If already taken, it will
 // be moved to a location close to it.
+
+bool Ped::Model::safeMove(Ped::Tagent *agent) {
+  // Try to set isMoving to true; if it was already true, skip moving.
+  bool expected = false;
+  if (!agent->isMoving.compare_exchange_strong(expected, true,
+                                               std::memory_order_acquire,
+                                               std::memory_order_relaxed)) {
+    // Another thread is already moving this agent.
+    return false;
+  }
+
+  // At this point, this thread exclusively owns the agent.
+  move(agent);
+
+  // Release the flag after moving.
+  agent->isMoving.store(false, std::memory_order_release);
+  return true;
+}
+
 void Ped::Model::move(Ped::Tagent *agent) {
   // Search for neighboring agents
   set<const Ped::Tagent *> neighbors =
