@@ -115,6 +115,8 @@ void Ped::Model::sequential_tick() {
   }
 }
 
+
+
 // The refactored vector_tick() function.
 void Ped::Model::vector_tick() {
   const int num_agents = static_cast<int>(agents.size());

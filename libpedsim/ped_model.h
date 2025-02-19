@@ -37,6 +37,7 @@ public:
   // Coordinates a time step in the scenario: move all agents by one step (if
   // applicable).
   void tick();
+  void region_tick();
 
   // tick for sequential implementation
   void sequential_tick();
@@ -70,6 +71,9 @@ public:
   IMPLEMENTATION getImplementation() { return implementation; }
   static void warmup();
 
+  // Moves an agent towards its next position
+  void move(Ped::Tagent *agent);
+
 private:
   // Denotes which implementation (sequential, parallel implementations..)
   // should be used for calculating the desired positions of
@@ -96,9 +100,6 @@ private:
   // The waypoints in this scenario
   std::vector<Twaypoint *> destinations;
   std::ofstream file;
-
-  // Moves an agent towards its next position
-  void move(Ped::Tagent *agent);
 
   ////////////
   /// Everything below here won't be relevant until Assignment 3
