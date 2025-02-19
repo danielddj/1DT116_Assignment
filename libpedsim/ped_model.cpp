@@ -12,6 +12,8 @@ TAgent maybe, new class for bdry and have ptr to it in each agent?.
 */
 
 #include "ped_model.h"
+#include "ped_region.h"
+#include "ped_regionhandler.h"
 #include "ped_waypoint.h"
 #include <algorithm>
 #include <cmath>
@@ -63,6 +65,10 @@ void Ped::Model::setup(std::vector<Ped::Tagent *> agentsInScenario,
   popluate_waypoint_vectors();
 
   populate_agent_vectors();
+
+  if (implementation == REGION) {
+    init_region();
+  }
 }
 
 /*
@@ -110,8 +116,7 @@ void Ped::Model::sequential_tick() {
     agents[i]->computeNextDesiredPosition();
 
     // Set the agent's position to the desired position
-    X[i] = desiredX[i];
-    Y[i] = desiredY[i];
+    move(agents[i]);
   }
 }
 
@@ -199,24 +204,6 @@ void Ped::Model::threads_tick() {
 // Moves the agent to the next desired position. If already taken, it will
 // be moved to a location close to it.
 
-bool Ped::Model::safeMove(Ped::Tagent *agent) {
-  // Try to set isMoving to true; if it was already true, skip moving.
-  bool expected = false;
-  if (!agent->isMoving.compare_exchange_strong(expected, true,
-                                               std::memory_order_acquire,
-                                               std::memory_order_relaxed)) {
-    // Another thread is already moving this agent.
-    return false;
-  }
-
-  // At this point, this thread exclusively owns the agent.
-  move(agent);
-
-  // Release the flag after moving.
-  agent->isMoving.store(false, std::memory_order_release);
-  return true;
-}
-
 void Ped::Model::move(Ped::Tagent *agent) {
   // Search for neighboring agents
   set<const Ped::Tagent *> neighbors =
@@ -295,6 +282,14 @@ Ped::Model::~Model() {
                 [](Ped::Tagent *agent) { delete agent; });
   std::for_each(destinations.begin(), destinations.end(),
                 [](Ped::Twaypoint *destination) { delete destination; });
+}
+
+void Ped::Model::init_region() {
+  // --- New region system initialization ---
+  if (implementation == REGION) {
+    Ped::Region_handler *handler =
+        new Region_handler(4, true, 160, 120, 100, 0, agents);
+  }
 }
 
 void Ped::Model::popluate_waypoint_vectors() {

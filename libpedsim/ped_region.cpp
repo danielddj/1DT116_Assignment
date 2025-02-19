@@ -83,7 +83,7 @@ void Ped::Region::transfer_agents(Ped::Region_handler *handler) {
 
     Region *target = handler->next_region_for_agent(curr->agent);
     if (target) {
-      target->addAgent(curr->agent);
+      target->transfer_to(curr->agent);
     }
 
     delete curr;
@@ -91,7 +91,19 @@ void Ped::Region::transfer_agents(Ped::Region_handler *handler) {
   }
 }
 
+void Ped::Region::transfer_to(Ped::Tagent *agent) {
+  pending_transfers.push_back(agent);
+
+  addAgent(agent);
+}
+
 void Ped::Region::move_agents(Ped::Model *model, Ped::Region_handler *handler) {
+  for (auto agent : pending_transfers) {
+    model->move(agent);
+  }
+
+  pending_transfers.clear();
+
   AgentNode *curr = agent_list_head;
   while (curr) {
     curr->agent.load()->computeNextDesiredPosition();
@@ -101,8 +113,6 @@ void Ped::Region::move_agents(Ped::Model *model, Ped::Region_handler *handler) {
       curr = curr->next;
     } else {
       transfer_agents(handler);
-
-      model->safeMove(curr->agent.load());
     }
   }
 }

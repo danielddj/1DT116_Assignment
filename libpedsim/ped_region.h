@@ -18,6 +18,7 @@ public:
 
   void move_agents(Ped::Model *model, Ped::Region_handler *handler);
   bool contains_desired(Ped::Tagent *agent) const;
+  void addAgent(Ped::Tagent *agent);
 
 protected:
   Region(std::vector<Ped::Tagent> agentVector);
@@ -30,19 +31,20 @@ private:
     std::atomic<AgentNode *> next;
   };
 
-  std::vector<Ped::Tagent> agentsInRegion;
+  std::vector<Ped::Tagent *> agents_in_region;
+  std::vector<Ped::Tagent *> pending_transfers;
 
   int xMin, xMax, yMin, yMax;
 
   std::atomic<AgentNode *> agent_list_head;
   std::atomic<int> agentCount;
   bool removeAgent(Ped::Tagent *agent);
-  void addAgent(Ped::Tagent *agent);
   bool contains(Ped::Tagent *agent) const;
   bool check_succesful_add(AgentNode *new_head, AgentNode *old_head);
 
   typedef std::function<Region *(Tagent *)> TargetRegionFunc;
   void transfer_agents(Ped::Region_handler *handler);
+  void transfer_to(Ped::Tagent *agent);
   int startRegionX;
   int endRegionX;
   int startRegionY;

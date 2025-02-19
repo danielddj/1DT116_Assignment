@@ -6,7 +6,8 @@
 namespace Ped {
 Region_handler::Region_handler(size_t start_regions, bool resize, size_t max_x,
                                size_t max_y, size_t max_agents,
-                               size_t min_agents)
+                               size_t min_agents,
+                               std::vector<Ped::Tagent *> agents)
     : dynamic_resize(resize), max_x(max_x), max_y(max_y),
       max_agents(max_agents), min_agents(min_agents) {
 
@@ -18,6 +19,8 @@ Region_handler::Region_handler(size_t start_regions, bool resize, size_t max_x,
   // Calculate each region's approximate width and height.
   size_t region_width = max_x / grid_dim;
   size_t region_height = max_y / grid_dim;
+
+  size_t added_agents = 0;
 
   // Create regions for each grid cell.
   for (size_t row = 0; row < grid_dim; ++row) {
@@ -31,8 +34,18 @@ Region_handler::Region_handler(size_t start_regions, bool resize, size_t max_x,
       size_t width = (col == grid_dim - 1) ? (max_x - x) : region_width;
       size_t height = (row == grid_dim - 1) ? (max_y - y) : region_height;
 
-      add_region(x, y, width, height);
+      Region *added_region = add_region(x, y, width, height);
+
+      for (auto agent : agents) {
+        if (added_region->contains_desired(agent)) {
+          added_region->addAgent(agent);
+          added_agents++;
+        }
+      }
     }
+  }
+  if (added_agents != agents.size()) {
+    std::runtime_error("ERROR: Some agents were not assigned region!");
   }
 }
 
@@ -71,8 +84,11 @@ void Region_handler::tick_regions(Model *model) {
   }
 }
 
-void Region_handler::add_region(size_t x, size_t y, size_t width,
-                                size_t height) {
-  regions.push_back(new Region(x, y, width, height));
+Ped::Region *Region_handler::add_region(size_t x, size_t y, size_t width,
+                                        size_t height) {
+  Ped::Region *new_region = new Region(x, y, width, height);
+  regions.push_back(new_region);
+
+  return new_region;
 }
 } // namespace Ped

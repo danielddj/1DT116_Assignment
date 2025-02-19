@@ -25,7 +25,7 @@ class Tagent;
 
 // The implementation modes for Assignment 1 + 2:
 // chooses which implementation to use for tick()
-enum IMPLEMENTATION { CUDA, VECTOR, OMP, PTHREAD, SEQ, THREADS };
+enum IMPLEMENTATION { CUDA, VECTOR, OMP, PTHREAD, SEQ, THREADS, REGION };
 
 class Model {
 public:
@@ -73,7 +73,6 @@ public:
 
   // Moves an agent towards its next position
   void move(Ped::Tagent *agent);
-  bool safeMove(Ped::Tagent *agent);
 
 private:
   // Denotes which implementation (sequential, parallel implementations..)
@@ -87,6 +86,7 @@ private:
       destinationR; // Destination points
 
   std::vector<float> X_WP, Y_WP, R_WP; // Waypoint Position
+  void init_region();
 
   size_t tick_cuda(size_t ticks, float *d_bufferX1, float *d_bufferX2,
                    float *d_bufferY1, float *d_bufferY2, float *agentDesX,
