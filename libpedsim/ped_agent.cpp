@@ -21,6 +21,22 @@ Ped::Tagent::Tagent(double posX, double posY) {
     Ped::Tagent::init((int)round(posX), (int)round(posY));
 }
 
+void Ped::Tagent::initialize(int i, std::vector<float>* X, std::vector<float>* Y, 
+    std::vector<float>* desiredX, std::vector<float>* desiredY,
+    std::vector<float>* destinationX, std::vector<float>* destinationY, 
+    std::vector<float>* destinationR) 
+    {
+        this->id = i;
+        this->X = X;
+        this->Y = Y;
+        this->desiredX = desiredX;
+        this->desiredY = desiredY;
+        this->destinationX = destinationX;
+        this->destinationY = destinationY;
+        this->destinationR = destinationR;
+    }
+
+
 void Ped::Tagent::init(int posX, int posY) {
     x = posX;
     y = posY;
@@ -42,13 +58,19 @@ void Ped::Tagent::computeNextDesiredPosition() {
         return;
     } 
 
-    double diffX = destination->getx() - X[id];
-    double diffY = destination->gety() - Y[id];
+    double diffX = destination->getx() - (*X)[id];
+    double diffY = destination->gety() - (*Y)[id];
     double len = sqrt(diffX * diffX + diffY * diffY);
 
     //Store into vectors instead of Agent object
-    desiredX[id] = (float)round(X[id] + diffX / len);
-    desiredY[id] = (float)round(Y[id] + diffY / len);	
+    //Prevent division by zero
+    if (len != 0) {
+        // movement calculation
+        (*desiredX)[id] = (float)round((*X)[id] + diffX / len);
+        (*desiredY)[id] = (float)round((*Y)[id] + diffY / len);
+    }
+
+    //cout << "Agent " << id <<" computed desired position: " << (*desiredX)[id] << ", " << (*desiredY)[id] << endl;
     
 }
 
@@ -62,8 +84,8 @@ Ped::Twaypoint* Ped::Tagent::getNextDestination() {
 
     if (destination != NULL) {
         // compute if agent reached its current destination
-        double diffX = destinationX[id] - X[id];
-        double diffY = destinationY[id] - Y[id];
+        double diffX = (*destinationX)[id] - (*X)[id];
+        double diffY = (*destinationY)[id] - (*Y)[id];
         double length = sqrt(diffX * diffX + diffY * diffY);
         agentReachedDestination = length < destination->getr();
     }
@@ -82,13 +104,13 @@ Ped::Twaypoint* Ped::Tagent::getNextDestination() {
 
     // Store next destination in global vectors
     if (nextDestination != NULL) {
-        destinationX[id] = nextDestination->getx();
-        destinationY[id] = nextDestination->gety();
-        destinationR[id] = nextDestination->getr();
+        (*destinationX)[id] = nextDestination->getx();
+        (*destinationY)[id] = nextDestination->gety();
+        (*destinationR)[id] = nextDestination->getr();
     } else {
         // Arrived
-        destinationX[id] = X[id];
-        destinationY[id] = Y[id];
+        (*destinationX)[id] = (*X)[id];
+        (*destinationY)[id] = (*Y)[id];
     }
     return nextDestination;
 }
