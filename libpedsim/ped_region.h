@@ -18,7 +18,7 @@ class Region_handler;
 // operations on it using the provided overloads.
 struct AgentNode {
   Tagent *agent;
-  std::shared_ptr<AgentNode> next; // not wrapped in std::atomic
+  std::shared_ptr<AgentNode> next; 
 
   AgentNode(Tagent *a);
 };
