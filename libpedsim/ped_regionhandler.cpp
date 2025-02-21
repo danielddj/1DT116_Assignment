@@ -58,7 +58,138 @@ void Region_handler::valid_region_count(size_t start_regions) {
   }
 }
 
-void Region_handler::resize_regions() {}
+static bool areAdjacent(Region *r1, Region *r2) {
+  // Horizontal adjacency
+  if (r1->yMin == r2->yMin && r1->yMax == r2->yMax) {
+    if (r1->xMax == r2->xMin || r2->xMax == r1->xMin)
+      return true;
+  }
+  // Vertical adjacency
+  if (r1->xMin == r2->xMin && r1->xMax == r2->xMax) {
+    if (r1->yMax == r2->yMin || r2->yMax == r1->yMin)
+      return true;
+  }
+  return false;
+}
+
+static Region *mergeRegions(Region *r1, Region *r2) {
+  int newXMin = std::min(r1->xMin, r2->xMin);
+  int newXMax = std::max(r1->xMax, r2->xMax);
+  int newYMin = std::min(r1->yMin, r2->yMin);
+  int newYMax = std::max(r1->yMax, r2->yMax);
+  Region *merged = new Region(newXMin, newXMax, newYMin, newYMax);
+
+  // Redistribute agents from r1.
+  auto curr = std::atomic_load_explicit(&r1->agent_list_head,
+                                        std::memory_order_acquire);
+  while (curr) {
+    Tagent *agent = curr->agent;
+    if (agent) {
+      merged->addAgent(agent);
+    }
+    curr = std::atomic_load_explicit(&curr->next, std::memory_order_acquire);
+  }
+  // And from r2.
+  curr = std::atomic_load_explicit(&r2->agent_list_head,
+                                   std::memory_order_acquire);
+  while (curr) {
+    Tagent *agent = curr->agent;
+    if (agent) {
+      merged->addAgent(agent);
+    }
+    curr = std::atomic_load_explicit(&curr->next, std::memory_order_acquire);
+  }
+  // Also combine any pending transfers.
+  for (auto agent : r1->pending_transfers) {
+    merged->pending_transfers.push_back(agent);
+  }
+  for (auto agent : r2->pending_transfers) {
+    merged->pending_transfers.push_back(agent);
+  }
+
+  return merged;
+}
+
+void Region_handler::resize_regions() {
+  std::cout << "RESIZED" << std::endl;
+  std::vector<Region *> new_regions;
+
+  // First pass: for each region, if overcrowded, split it.
+  for (auto region : regions) {
+    if (region->agentCount.load(std::memory_order_relaxed) > max_agents) {
+
+      // Compute midpoints.
+      int midX = (region->xMin + region->xMax) / 2;
+      int midY = (region->yMin + region->yMax) / 2;
+
+      // Create four subregions.
+      Region *r1 = new Region(region->xMin, midX, region->yMin, midY);
+      Region *r2 = new Region(midX, region->xMax, region->yMin, midY);
+      Region *r3 = new Region(region->xMin, midX, midY, region->yMax);
+      Region *r4 = new Region(midX, region->xMax, midY, region->yMax);
+
+      // Redistribute agents from the old region.
+      auto curr = std::atomic_load_explicit(&region->agent_list_head,
+                                            std::memory_order_acquire);
+      while (curr) {
+        Tagent *agent = curr->agent;
+        if (agent) {
+          if (r1->contains(agent))
+            r1->addAgent(agent);
+          else if (r2->contains(agent))
+            r2->addAgent(agent);
+          else if (r3->contains(agent))
+            r3->addAgent(agent);
+          else if (r4->contains(agent))
+            r4->addAgent(agent);
+          else
+            r1->addAgent(agent);
+        }
+        curr =
+            std::atomic_load_explicit(&curr->next, std::memory_order_acquire);
+      }
+
+      new_regions.push_back(r1);
+      new_regions.push_back(r2);
+      new_regions.push_back(r3);
+      new_regions.push_back(r4);
+
+      delete region;
+    } else {
+      // Region remains as is.
+      new_regions.push_back(region);
+    }
+  }
+
+  // Second pass: merge regions that are underpopulated.
+  std::vector<Region *> merged_regions;
+  std::vector<bool> merged(new_regions.size(), false);
+
+  for (size_t i = 0; i < new_regions.size(); i++) {
+    if (merged[i])
+      continue;
+    Region *current = new_regions[i];
+    // If current region is underpopulated, try to merge it with adjacent
+    // underpopulated regions.
+    if (current->agentCount.load(std::memory_order_relaxed) < min_agents) {
+      for (size_t j = i + 1; j < new_regions.size(); j++) {
+        if (!merged[j] && new_regions[j]->agentCount.load(
+                              std::memory_order_relaxed) < min_agents) {
+          if (areAdjacent(current, new_regions[j])) {
+            Region *mergedRegion = mergeRegions(current, new_regions[j]);
+            // Mark region j as merged.
+            merged[j] = true;
+            // Update current to the newly merged region.
+            current = mergedRegion;
+          }
+        }
+      }
+    }
+    merged_regions.push_back(current);
+  }
+
+  regions = merged_regions;
+}
 
 Region *Region_handler::next_region_for_agent(Tagent *agent) {
 
@@ -72,10 +203,24 @@ Region *Region_handler::next_region_for_agent(Tagent *agent) {
 }
 
 void Region_handler::tick_regions(Model *model) {
-
+#pragma omp parallel num_threads(12)
+  {
+// perform the tick operation for all agents
+#pragma omp for schedule(static)
     for (auto &region : regions) {
       region->move_agents(model, this);
     }
+  }
+
+  for (auto &region : regions) {
+    for (auto &agent : region->pending_transfers) {
+      agent->computeNextDesiredPosition();
+      model->move(agent);
+    }
+    region->pending_transfers.clear();
+  }
+
+  resize_regions();
 }
 
 Ped::Region *Region_handler::add_region(size_t x, size_t y, size_t width,

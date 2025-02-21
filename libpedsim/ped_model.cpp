@@ -296,7 +296,7 @@ Ped::Model::~Model() {
 }
 
 void Ped::Model::init_region() {
-  handler = new Region_handler(4, true, 160, 120, 100, 0, agents);
+  handler = new Region_handler(4, true, 160, 120, 200, 25, agents);
 }
 
 void Ped::Model::popluate_waypoint_vectors() {

@@ -46,9 +46,6 @@ void Ped::Tagent::init(int posX, int posY) {
 void Ped::Tagent::callNextDestination() { destination = getNextDestination(); }
 
 void Ped::Tagent::computeNextDesiredPosition() {
-  if (id == 382) {
-    std::cout << "tes" << std::endl;
-  }
   destination = getNextDestination();
   if (destination == NULL) {
     // No destination, so nothing to compute.
