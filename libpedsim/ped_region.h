@@ -1,56 +1,62 @@
-#ifndef _ped_region_h_
-#define _ped_region_h_
+#ifndef PED_REGION_H
+#define PED_REGION_H
 
+#include <vector>
+#include <memory>
+#include <atomic>
+#include <iostream>
 #include "ped_agent.h"
 #include "ped_model.h"
-#include "ped_regionhandler.h"
-#include <atomic>
-#include <functional>
-#include <vector>
 
 namespace Ped {
+
+// Forward declaration for Region_handler (assumed defined elsewhere)
 class Region_handler;
-class Region {
-public:
-  Region(int x_min, int x_max, int y_min, int y_max)
-      : xMin(x_min), xMax(x_max), yMin(y_min), yMax(y_max),
-        agent_list_head(nullptr), agentCount(0) {}
 
-  void move_agents(Ped::Model *model, Ped::Region_handler *handler);
-  bool contains_desired(Ped::Tagent *agent) const;
-  void addAgent(Ped::Tagent *agent);
+// Node for the lock-free agent linked list.
+// We store the next pointer as a plain std::shared_ptr, but perform atomic
+// operations on it using the provided overloads.
+struct AgentNode {
+    Tagent* agent;
+    std::shared_ptr<AgentNode> next; // not wrapped in std::atomic
 
-protected:
-  Region(std::vector<Ped::Tagent> agentVector);
-  ~Region();
-  bool is_in_region(Ped::Tagent agent);
-
-private:
-  struct AgentNode {
-    std::atomic<Ped::Tagent *> agent;
-    std::atomic<AgentNode *> next;
-  };
-
-  std::vector<Ped::Tagent *> agents_in_region;
-  std::vector<Ped::Tagent *> pending_transfers;
-
-  int xMin, xMax, yMin, yMax;
-
-  std::atomic<AgentNode *> agent_list_head;
-  std::atomic<int> agentCount;
-  bool removeAgent(Ped::Tagent *agent);
-  bool contains(Ped::Tagent *agent) const;
-  bool check_succesful_add(AgentNode *new_head, AgentNode *old_head);
-
-  typedef std::function<Region *(Tagent *)> TargetRegionFunc;
-  void transfer_agents(Ped::Region_handler *handler);
-  void transfer_to(Ped::Tagent *agent);
-  int startRegionX;
-  int endRegionX;
-  int startRegionY;
-  int endRegionY;
+    AgentNode(Tagent* a);
 };
 
-} // Namespace Ped
+// The Region class supports lock-free insertion, removal, and transfer.
+class Region {
+public:
+    // Region boundaries.
+    int xMin, xMax, yMin, yMax;
 
-#endif
+    // Head pointer for the linked list.
+    // We use a plain shared_ptr here and perform atomic operations via atomic_load etc.
+    std::shared_ptr<AgentNode> agent_list_head;
+    // Count of agents.
+    std::atomic<int> agentCount;
+    // Agents pending transfer into this region.
+    std::vector<Tagent*> pending_transfers;
+
+    // Constructor.
+    Region(int x_min = 0, int x_max = 100, int y_min = 0, int y_max = 100);
+
+    // Returns true if the agent's current position is in-region.
+    bool contains(Tagent* agent) const;
+    // Returns true if the agent's desired position is in-region.
+    bool contains_desired(Tagent* agent) const;
+
+    // Add an agent to this region.
+    void addAgent(Tagent* agent);
+    // Remove an agent from this region; returns true if removed.
+    bool removeAgent(Tagent* agent);
+    // Transfer an agent from this region to another region via the handler.
+    void transfer_agents(Region_handler* handler, Tagent* agent);
+    // Transfer an agent into this region.
+    void transfer_to(Tagent* agent);
+    // Process movement of agents in this region.
+    void move_agents(Model* model, Region_handler* handler);
+};
+
+} // namespace Ped
+
+#endif // PED_REGION_H

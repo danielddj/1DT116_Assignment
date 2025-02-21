@@ -18,14 +18,25 @@
 #include <vector>
 
 #include "ped_agent.h"
+#include "ped_regionhandler.h"
 
 namespace Ped {
 
 class Tagent;
+class Region_handler;
 
 // The implementation modes for Assignment 1 + 2:
 // chooses which implementation to use for tick()
-enum IMPLEMENTATION { CUDA, VECTOR, OMP, PTHREAD, SEQ, THREADS, REGION };
+enum IMPLEMENTATION {
+  CUDA,
+  VECTOR,
+  OMP,
+  PTHREAD,
+  SEQ,
+  THREADS,
+  SEQ_REGION,
+  OMP_REGION
+};
 
 class Model {
 public:
@@ -87,6 +98,7 @@ private:
 
   std::vector<float> X_WP, Y_WP, R_WP; // Waypoint Position
   void init_region();
+  Ped::Region_handler *handler;
 
   size_t tick_cuda(size_t ticks, float *d_bufferX1, float *d_bufferX2,
                    float *d_bufferY1, float *d_bufferY2, float *agentDesX,

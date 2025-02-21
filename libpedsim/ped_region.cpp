@@ -1,118 +1,128 @@
 #include "ped_region.h"
+#include "ped_regionhandler.h" // Contains the definition of Region_handler
 #include "ped_agent.h"
 #include "ped_model.h"
-#include <vector>
 
-namespace Ped {}
+namespace Ped {
 
-// Check if a point (x,y) is in this region.
-bool Ped::Region::contains(Ped::Tagent *agent) const {
-  int x = agent->getX();
-  int y = agent->getY();
+// AgentNode constructor.
+AgentNode::AgentNode(Tagent* a)
+    : agent(a), next(nullptr)
+{}
 
-  return (x >= xMin && x < xMax) && (y >= yMin && y < yMax);
+// Region constructor.
+Region::Region(int x_min, int x_max, int y_min, int y_max)
+    : xMin(x_min), xMax(x_max), yMin(y_min), yMax(y_max),
+      agent_list_head(nullptr), agentCount(0)
+{}
+
+// Check if an agent's current position is within region boundaries.
+bool Region::contains(Tagent* agent) const {
+    int x = agent->X->at(agent->getId());
+    int y = agent->Y->at(agent->getId());
+    return (x >= xMin && x < xMax) && (y >= yMin && y < yMax);
 }
 
-bool Ped::Region::contains_desired(Ped::Tagent *agent) const {
-  int x = agent->getDesiredX();
-  int y = agent->getDesiredY();
-
-  return (x >= xMin && x < xMax) && (y >= yMin && y < yMax);
+// Check if an agent's desired position is within region boundaries.
+bool Region::contains_desired(Tagent* agent) const {
+    int x = agent->desiredX->at(agent->getId());
+    int y = agent->desiredY->at(agent->getId());
+    return (x >= xMin && x < xMax) && (y >= yMin && y < yMax);
 }
 
-// Insert an agent (lock-free via CAS).
-void Ped::Region::addAgent(Ped::Tagent *agent) {
-
-  AgentNode *new_node = new AgentNode{agent, nullptr};
-
-  AgentNode *old_head = agent_list_head.load(std::memory_order_relaxed);
-
-  do {
-    new_node->next.store(old_head, std::memory_order_relaxed);
-
-  } while (!check_succesful_add(new_node, old_head));
-
-  agentCount.fetch_add(1, std::memory_order_relaxed);
+// Add an agent to the head of the linked list using atomic operations on shared_ptr.
+void Region::addAgent(Tagent* agent) {
+    auto new_node = std::make_shared<AgentNode>(agent);
+    // Atomically load the current head.
+    std::shared_ptr<AgentNode> old_head = std::atomic_load_explicit(&agent_list_head, std::memory_order_relaxed);
+    do {
+        new_node->next = old_head; // Set new_node->next to the current head.
+        // Attempt to atomically replace the head with new_node.
+    } while (!std::atomic_compare_exchange_weak_explicit(
+        &agent_list_head, &old_head, new_node,
+        std::memory_order_release, std::memory_order_relaxed));
+    agentCount.fetch_add(1, std::memory_order_relaxed);
 }
 
-bool Ped::Region::check_succesful_add(AgentNode *new_head,
-                                      AgentNode *old_head) {
-  return agent_list_head.compare_exchange_weak(
-      old_head, new_head, std::memory_order_release, std::memory_order_relaxed);
-}
-
-// Remove an agent (using CAS) – returns true if successful.
-bool Ped::Region::removeAgent(Ped::Tagent *agent) {
-  AgentNode *prev = nullptr;
-  AgentNode *curr = agent_list_head.load(std::memory_order_acquire);
-
-  while (curr) {
-    if (curr->agent == agent) {
-      AgentNode *next = curr->next.load(std::memory_order_acquire);
-
-      if (prev) {
-        if (!prev->next.compare_exchange_strong(curr, next,
-                                                std::memory_order_release)) {
-          // List changed, restart removal.
-          return removeAgent(agent);
+// Remove an agent from the list using atomic operations on shared_ptr.
+bool Region::removeAgent(Tagent* agent) {
+    std::shared_ptr<AgentNode> prev = nullptr;
+    auto curr = std::atomic_load_explicit(&agent_list_head, std::memory_order_acquire);
+    while (curr) {
+        if (curr->agent == agent) {
+            // Atomically load the next pointer.
+            std::shared_ptr<AgentNode> next = std::atomic_load_explicit(&curr->next, std::memory_order_acquire);
+            if (prev) {
+                // Try to update prev->next to bypass curr.
+                if (!std::atomic_compare_exchange_strong_explicit(
+                        &prev->next, &curr, next,
+                        std::memory_order_release, std::memory_order_acquire)) {
+                    // The list changed concurrently; restart removal.
+                    return removeAgent(agent);
+                }
+            } else {
+                // Remove from the head.
+                if (!std::atomic_compare_exchange_strong_explicit(
+                        &agent_list_head, &curr, next,
+                        std::memory_order_release, std::memory_order_acquire)) {
+                    return removeAgent(agent);
+                }
+            }
+            agentCount.fetch_sub(1, std::memory_order_relaxed);
+            // The removed node will be deallocated automatically when no references remain.
+            return true;
         }
-      } else {
-        if (!agent_list_head.compare_exchange_strong(
-                curr, next, std::memory_order_release)) {
-          return removeAgent(agent);
+        prev = curr;
+        curr = std::atomic_load_explicit(&curr->next, std::memory_order_acquire);
+    }
+    return false;
+}
+
+// Transfer an agent from this region to another region via the Region_handler.
+void Region::transfer_agents(Region_handler* handler, Tagent* agent) {
+    if (!removeAgent(agent)) {
+        std::cerr << "[ERROR] Failed to remove agent from current region." << std::endl;
+        return;
+    }
+    Region* target = handler->next_region_for_agent(agent);
+    if (!target) {
+        std::cerr << "[ERROR] No target region found for agent." << std::endl;
+        return;
+    }
+    target->transfer_to(agent);
+}
+
+// Transfer an agent into this region.
+void Region::transfer_to(Tagent* agent) {
+    pending_transfers.push_back(agent);
+    addAgent(agent);
+}
+
+// Process movement of agents in this region.
+void Region::move_agents(Model* model, Region_handler* handler) {
+    // Process pending transfers.
+    for (auto agent : pending_transfers) {
+        agent->computeNextDesiredPosition();
+        model->move(agent);
+    }
+    pending_transfers.clear();
+
+    auto curr = std::atomic_load_explicit(&agent_list_head, std::memory_order_acquire);
+    while (curr) {
+        std::cout << "[DEBUG] Processing AgentNode at " << curr.get() << std::endl;
+        Tagent* agent = curr->agent;
+        if (!agent) {
+            std::cerr << "[ERROR] Agent pointer is null at node " << curr.get() << std::endl;
+            break;
         }
-      }
-      agentCount.fetch_sub(1, std::memory_order_relaxed);
-
-      delete curr;
-      return true;
+        agent->computeNextDesiredPosition();
+        if (contains_desired(agent)) {
+            model->move(agent);
+        } else {
+            transfer_agents(handler, agent);
+        }
+        curr = std::atomic_load_explicit(&curr->next, std::memory_order_acquire);
     }
-    prev = curr;
-    curr = curr->next.load(std::memory_order_acquire);
-  }
-  return false;
 }
 
-void Ped::Region::transfer_agents(Ped::Region_handler *handler) {
-  AgentNode *curr =
-      agent_list_head.exchange(nullptr, std::memory_order_acquire);
-  agentCount.store(0, std::memory_order_relaxed);
-
-  while (curr) {
-    AgentNode *next = curr->next.load(std::memory_order_acquire);
-
-    Region *target = handler->next_region_for_agent(curr->agent);
-    if (target) {
-      target->transfer_to(curr->agent);
-    }
-
-    delete curr;
-    curr = next;
-  }
-}
-
-void Ped::Region::transfer_to(Ped::Tagent *agent) {
-  pending_transfers.push_back(agent);
-
-  addAgent(agent);
-}
-
-void Ped::Region::move_agents(Ped::Model *model, Ped::Region_handler *handler) {
-  for (auto agent : pending_transfers) {
-    model->move(agent);
-  }
-
-  pending_transfers.clear();
-
-  AgentNode *curr = agent_list_head;
-  while (curr) {
-    curr->agent.load()->computeNextDesiredPosition();
-
-    if (contains_desired(curr->agent.load())) {
-      model->move(curr->agent);
-      curr = curr->next;
-    } else {
-      transfer_agents(handler);
-    }
-  }
-}
+} // namespace Ped

@@ -65,6 +65,8 @@ public:
 
   // returns all waypoints
   deque<Twaypoint *> getDestination() { return waypoints; };
+  std::vector<float> *X, *Y;
+  std::vector<float> *desiredX, *desiredY;
 
 private:
   Tagent(){};
@@ -73,8 +75,6 @@ private:
   int id;
 
   // Pointers to vectors
-  std::vector<float> *X, *Y;
-  std::vector<float> *desiredX, *desiredY;
   std::vector<float> *destinationX, *destinationY, *destinationR;
 
   // The agent's current position

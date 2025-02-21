@@ -37,7 +37,7 @@ Region_handler::Region_handler(size_t start_regions, bool resize, size_t max_x,
       Region *added_region = add_region(x, y, width, height);
 
       for (auto agent : agents) {
-        if (added_region->contains_desired(agent)) {
+        if (added_region->contains(agent)) {
           added_region->addAgent(agent);
           added_agents++;
         }
@@ -73,20 +73,14 @@ Region *Region_handler::next_region_for_agent(Tagent *agent) {
 
 void Region_handler::tick_regions(Model *model) {
 
-  std::vector<Ped::Tagent *> agents = model->getAgents();
-#pragma omp parallel num_threads(4) shared(agents)
-  {
-// perform the tick operation for all agents
-#pragma omp for schedule(static)
     for (auto &region : regions) {
       region->move_agents(model, this);
     }
-  }
 }
 
 Ped::Region *Region_handler::add_region(size_t x, size_t y, size_t width,
                                         size_t height) {
-  Ped::Region *new_region = new Region(x, y, width, height);
+  Ped::Region *new_region = new Region(x, x + width, y, y + height);
   regions.push_back(new_region);
 
   return new_region;

@@ -66,7 +66,7 @@ void Ped::Model::setup(std::vector<Ped::Tagent *> agentsInScenario,
 
   populate_agent_vectors();
 
-  if (implementation == REGION) {
+  if (implementation == OMP_REGION) {
     init_region();
   }
 }
@@ -96,18 +96,24 @@ void Ped::Model::tick() {
   case VECTOR:
     vector_tick();
     break;
-  case REGION:
+  case OMP_REGION:
+    region_tick();
     break;
   default:
     std::cout << "Unknown implementation." << std::endl;
     exit(1);
   }
 
-    for (int i = 0; i < agents.size(); ++i) {
-      // TESTING (for visualization)
-      agents[i]->setX(desiredX[i]);
-      agents[i]->setY(desiredY[i]);
-    }
+  for (int i = 0; i < agents.size(); ++i) {
+    // TESTING (for visualization)
+    agents[i]->setX(X[i]);
+    agents[i]->setY(Y[i]);
+  }
+}
+
+void Ped::Model::region_tick() {
+  // Parallelize processing over regions (using OpenMP here).
+  handler->tick_regions(this);
 }
 
 void Ped::Model::sequential_tick() {
@@ -117,7 +123,8 @@ void Ped::Model::sequential_tick() {
     // Compute the next desired position of the agent
     agents[i]->computeNextDesiredPosition();
 
-    move(agents[i]);
+    X[i] = agents[i]->getDesiredX();
+    Y[i] = agents[i]->getDesiredY();
   }
 }
 
@@ -289,10 +296,7 @@ Ped::Model::~Model() {
 }
 
 void Ped::Model::init_region() {
-  if (implementation == REGION) {
-    Ped::Region_handler *handler =
-        new Region_handler(4, true, 160, 120, 100, 0, agents);
-  }
+  handler = new Region_handler(4, true, 160, 120, 100, 0, agents);
 }
 
 void Ped::Model::popluate_waypoint_vectors() {

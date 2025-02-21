@@ -7,6 +7,7 @@
 
 namespace Ped {
 class Region;
+class Model;
 class Region_handler {
 
 public:
@@ -18,6 +19,7 @@ public:
   std::vector<Ped::Region *> regions;
 
   Ped::Region *next_region_for_agent(Ped::Tagent *agent);
+  void tick_regions(Ped::Model *model);
 
 protected:
 private:
@@ -26,7 +28,6 @@ private:
   void resize_regions();
   void valid_region_count(size_t start_regions);
   Ped::Region *add_region(size_t x, size_t y, size_t width, size_t height);
-  void tick_regions(Ped::Model *model);
 };
 
 } // namespace Ped
