@@ -103,12 +103,21 @@ static Region *mergeRegions(Region *r1, Region *r2) {
   return merged;
 }
 
+void Region_handler::seq_tick_regions(Ped::Model *model) {
+  for (auto &region : regions) {
+    region->move_agents(model, this);
+  }
+
+  resize_regions();
+}
+
 void Region_handler::resize_regions() {
   std::vector<Region *> new_regions;
 
   // First pass: for each region, if overcrowded, split it.
   for (auto region : regions) {
     if (region->agentCount.load(std::memory_order_relaxed) > max_agents) {
+      std::cout << "Split!" << std::endl;
 
       // Compute midpoints.
       int midX = (region->xMin + region->xMax) / 2;
@@ -170,6 +179,7 @@ void Region_handler::resize_regions() {
           if (areAdjacent(current, new_regions[j])) {
             Region *mergedRegion = mergeRegions(current, new_regions[j]);
             // Mark region j as merged.
+            std::cout << "Merged!" << std::endl;
             merged[j] = true;
             // Update current to the newly merged region.
             current = mergedRegion;
@@ -195,7 +205,8 @@ Region *Region_handler::next_region_for_agent(Tagent *agent) {
 }
 
 void Region_handler::tick_regions(Model *model) {
-#pragma omp parallel num_threads(12)
+  size_t threads = model->numberOfThreads;
+#pragma omp parallel num_threads(threads)
   {
 // perform the tick operation for all agents
 #pragma omp for schedule(static)

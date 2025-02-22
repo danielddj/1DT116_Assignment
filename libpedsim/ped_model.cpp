@@ -39,7 +39,9 @@ int Ped::Model::numberOfThreads =
 
 void Ped::Model::setup(std::vector<Ped::Tagent *> agentsInScenario,
                        std::vector<Twaypoint *> destinationsInScenario,
-                       IMPLEMENTATION implementation) {
+                       IMPLEMENTATION implementation, size_t start_regions,
+                       size_t width, size_t height, size_t min_agents,
+                       size_t max_agents, bool resize) {
 #ifndef NOCUDA
   // Convenience test: does CUDA work on this machine?
 #else
@@ -66,8 +68,12 @@ void Ped::Model::setup(std::vector<Ped::Tagent *> agentsInScenario,
 
   populate_agent_vectors();
 
-  if (implementation == OMP_REGION) {
-    init_region();
+  if (implementation == OMP_REGION || implementation == SEQ_REGION) {
+    if (start_regions < 4) {
+      std::runtime_error("Start_regions can not be less than 4");
+    }
+
+    init_region(start_regions, width, height, min_agents, max_agents, resize);
 
     for (int x = 0; x < MAP_WIDTH; x++) {
       for (int y = 0; y < MAP_HEIGHT; y++) {
@@ -105,6 +111,9 @@ void Ped::Model::tick() {
   case OMP_REGION:
     region_tick();
     break;
+  case SEQ_REGION:
+    seq_region_tick();
+    break;
   default:
     std::cout << "Unknown implementation." << std::endl;
     exit(1);
@@ -121,6 +130,7 @@ void Ped::Model::region_tick() {
   // Parallelize processing over regions (using OpenMP here).
   handler->tick_regions(this);
 }
+void Ped::Model::seq_region_tick() { handler->seq_tick_regions(this); }
 
 void Ped::Model::sequential_tick() {
   int num_agents = agents.size();
@@ -263,9 +273,7 @@ void Ped::Model::move(Ped::Tagent *agent) {
     }
   }
 
-
   if (!moved) {
-
   }
 }
 
@@ -318,8 +326,11 @@ Ped::Model::~Model() {
                 [](Ped::Twaypoint *destination) { delete destination; });
 }
 
-void Ped::Model::init_region() {
-  handler = new Region_handler(4, true, 160, 120, 200, 25, agents);
+void Ped::Model::init_region(size_t start_regions, size_t width, size_t height,
+                             size_t min_agents, size_t max_agents,
+                             bool resize) {
+  handler = new Region_handler(start_regions, resize, width, height, max_agents,
+                               min_agents, agents);
 }
 
 void Ped::Model::popluate_waypoint_vectors() {

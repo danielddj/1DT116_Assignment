@@ -20,6 +20,7 @@ public:
 
   Ped::Region *next_region_for_agent(Ped::Tagent *agent);
   void tick_regions(Ped::Model *model);
+  void seq_tick_regions(Ped::Model *model);
 
 protected:
 private:

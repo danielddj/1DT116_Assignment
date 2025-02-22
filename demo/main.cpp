@@ -90,6 +90,7 @@ int main(int argc, char *argv[]) {
         {"seq", no_argument, NULL, 'q'},
         {"threads", optional_argument, NULL, 'T'},
         {"omp-regions", optional_argument, NULL, 'R'},
+        {"seq-regions", optional_argument, NULL, 'S'},
 
         {0, 0, 0, 0} // End of options
     };
@@ -175,9 +176,21 @@ int main(int argc, char *argv[]) {
       std::cout << "Option --max-steps set to: " << max_steps << std::endl;
       break;
     case 'R':
+      // Handle --omp-regions
+      if (optarg != NULL) {
+        // If an argument is provided set it as the number of threads
+        Ped::Model::numberOfThreads = std::stoi(optarg);
+        std::cout << "Option --omp-regions set to: " << optarg << std::endl;
+      } else {
+        // If no argument is provided use the default number of threads
+        std::cout << "Option --omp-regions activated\n";
+      }
+      implementation_to_test = Ped::OMP;
+      break;
+    case 'S':
       // Handle --seq
-      std::cout << "Option --seq activated\n";
-      implementation_to_test = Ped::OMP_REGION;
+      std::cout << "Option --seq-regions activated\n";
+      implementation_to_test = Ped::SEQ_REGION;
       break;
     default:
       // Handle unknown long options
