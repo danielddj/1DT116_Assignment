@@ -96,10 +96,7 @@ void Region::transfer_agents(Region_handler *handler, Tagent *agent) {
 }
 
 // Transfer an agent into this region.
-void Region::transfer_to(Tagent *agent) {
-  addAgent(agent);
-  pending_transfers.push_back(agent);
-}
+void Region::transfer_to(Tagent *agent) { addAgent(agent); }
 
 // Process movement of agents in this region.
 void Region::move_agents(Ped::Model *model, Region_handler *handler) {
@@ -117,6 +114,7 @@ void Region::move_agents(Ped::Model *model, Region_handler *handler) {
       model->move(agent);
     } else {
       transfer_agents(handler, agent);
+      model->move(agent);
     }
     curr = std::atomic_load_explicit(&curr->next, std::memory_order_acquire);
   }

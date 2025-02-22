@@ -99,19 +99,11 @@ static Region *mergeRegions(Region *r1, Region *r2) {
     }
     curr = std::atomic_load_explicit(&curr->next, std::memory_order_acquire);
   }
-  // Also combine any pending transfers.
-  for (auto agent : r1->pending_transfers) {
-    merged->pending_transfers.push_back(agent);
-  }
-  for (auto agent : r2->pending_transfers) {
-    merged->pending_transfers.push_back(agent);
-  }
 
   return merged;
 }
 
 void Region_handler::resize_regions() {
-  std::cout << "RESIZED" << std::endl;
   std::vector<Region *> new_regions;
 
   // First pass: for each region, if overcrowded, split it.
@@ -210,14 +202,6 @@ void Region_handler::tick_regions(Model *model) {
     for (auto &region : regions) {
       region->move_agents(model, this);
     }
-  }
-
-  for (auto &region : regions) {
-    for (auto &agent : region->pending_transfers) {
-      agent->computeNextDesiredPosition();
-      model->move(agent);
-    }
-    region->pending_transfers.clear();
   }
 
   resize_regions();

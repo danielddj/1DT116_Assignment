@@ -90,6 +90,13 @@ private:
   // should be used for calculating the desired positions of
   // agents (Assignment 1)
   IMPLEMENTATION implementation;
+  static const int MAP_WIDTH = 160;
+  static const int MAP_HEIGHT = 120;
+  bool attemptOccupyCell(int newX, int newY, int myId);
+
+  // Clear a cell if (and only if) it’s still occupied by me.
+  void releaseCellIfOccupiedByMe(int oldX, int oldY, int myId);
+  std::atomic<int> occupant[MAP_WIDTH][MAP_HEIGHT];
 
   std::vector<float> X, Y;               // Position
   std::vector<float> desiredX, desiredY; // Desired movement

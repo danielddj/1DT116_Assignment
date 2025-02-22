@@ -89,6 +89,8 @@ int main(int argc, char *argv[]) {
         {"pthread", no_argument, NULL, 'p'},
         {"seq", no_argument, NULL, 'q'},
         {"threads", optional_argument, NULL, 'T'},
+        {"omp-regions", optional_argument, NULL, 'R'},
+
         {0, 0, 0, 0} // End of options
     };
 
@@ -171,6 +173,11 @@ int main(int argc, char *argv[]) {
       // Handle --max-steps with a numerical argument
       max_steps = std::stoi(optarg); // Convert the argument to an integer
       std::cout << "Option --max-steps set to: " << max_steps << std::endl;
+      break;
+    case 'R':
+      // Handle --seq
+      std::cout << "Option --seq activated\n";
+      implementation_to_test = Ped::OMP_REGION;
       break;
     default:
       // Handle unknown long options
