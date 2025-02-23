@@ -228,73 +228,62 @@ void Ped::Model::threads_tick() {
 // Moves the agent to the next desired position. If already taken, it will
 // be moved to a location close to it.
 
+// Moves the agent to the next desired position. If already taken, it will
+// be moved to a location close to it.
+// Moves the agent to the next desired position. If already taken, it will
+// be moved to a location close to it.
 void Ped::Model::move(Ped::Tagent *agent) {
-  const int agentID = agent->getId();
+  // Search for neighboring agents
+  set<const Ped::Tagent *> neighbors =
+      getNeighbors(X[agent->getId()], Y[agent->getId()], 2);
 
-  // Current (old) position
-  int oldX = X[agentID];
-  int oldY = Y[agentID];
-
-  // Build the three candidate positions
-  int dX = desiredX[agentID];
-  int dY = desiredY[agentID];
-
-  // Always try the desired position first
-  std::vector<std::pair<int, int>> candidates;
-  candidates.push_back({dX, dY});
-
-  int diffX = dX - oldX;
-  int diffY = dY - oldY;
-  if (diffX == 0 || diffY == 0) {
-    // agent moves straight N, S, E, or W
-    candidates.push_back({dX + diffY, dY + diffX}); // 2
-    candidates.push_back({dX - diffY, dY - diffX}); // 3
-  } else {
-    // agent moves diagonally
-    candidates.push_back({dX, oldY}); // 2
-    candidates.push_back({oldX, dY}); // 3
+  // Retrieve their positions
+  std::vector<std::pair<int, int>> takenPositions;
+  for (std::set<const Ped::Tagent *>::iterator neighborIt = neighbors.begin();
+       neighborIt != neighbors.end(); ++neighborIt) {
+    std::pair<int, int> position(X[(*neighborIt)->getId()],
+                                 Y[(*neighborIt)->getId()]);
+    takenPositions.push_back(position);
   }
 
-  bool moved = false;
-  for (auto &pos : candidates) {
-    int newX = pos.first;
-    int newY = pos.second;
+  // Compute the three alternative positions that would bring the agent
+  // closer to his desiredPosition, starting with the desiredPosition itself
+  std::vector<std::pair<int, int>> prioritizedAlternatives;
+  std::pair<int, int> pDesired(desiredX[agent->getId()],
+                               desiredY[agent->getId()]);
+  prioritizedAlternatives.push_back(pDesired);
 
-    // Try to claim (newX, newY) via CAS (occupant[newX][newY] == -1 => myID)
-    if (attemptOccupyCell(newX, newY, agentID)) {
-      // Occupation succeeded, so unclaim the old cell now:
-      releaseCellIfOccupiedByMe(oldX, oldY, agentID);
+  int diffX = pDesired.first - X[agent->getId()];
+  int diffY = pDesired.second - Y[agent->getId()];
+  std::pair<int, int> p1, p2;
+  if (diffX == 0 || diffY == 0) {
+    // Agent wants to walk straight to North, South, West or East
+    p1 = std::make_pair(pDesired.first + diffY, pDesired.second + diffX);
+    p2 = std::make_pair(pDesired.first - diffY, pDesired.second - diffX);
+  } else {
+    // Agent wants to walk diagonally
+    p1 = std::make_pair(pDesired.first, Y[agent->getId()]);
+    p2 = std::make_pair(X[agent->getId()], pDesired.second);
+  }
+  prioritizedAlternatives.push_back(p1);
+  prioritizedAlternatives.push_back(p2);
 
-      // Update the agent's known position
-      X[agentID] = newX;
-      Y[agentID] = newY;
-      moved = true;
+  // Find the first empty alternative position
+  for (std::vector<pair<int, int>>::iterator it =
+           prioritizedAlternatives.begin();
+       it != prioritizedAlternatives.end(); ++it) {
+
+    // If the current position is not yet taken by any neighbor
+    if (std::find(takenPositions.begin(), takenPositions.end(), *it) ==
+        takenPositions.end()) {
+
+      // Set the agent's position
+
+      X[agent->getId()] = (*it).first;
+      Y[agent->getId()] = (*it).second;
+
       break;
     }
-  }
-
-  if (!moved) {
-  }
-}
-
-bool Ped::Model::attemptOccupyCell(int x, int y, int myId) {
-  // Boundary check:
-  if (x < 0 || x >= MAP_WIDTH || y < 0 || y >= MAP_HEIGHT) {
-    return false; // out of bounds
-  }
-  int expected = -1; // -1 means "free cell"
-  // If occupant[x][y] is -1, replace it with myId (occupy).
-  // compare_exchange_strong returns true on success.
-  return occupant[x][y].compare_exchange_strong(
-      expected, myId, std::memory_order_acq_rel, std::memory_order_relaxed);
-}
-
-void Ped::Model::releaseCellIfOccupiedByMe(int x, int y, int myId) {
-  // If occupant[x][y] is me, set it back to -1.
-  if (x >= 0 && x < MAP_WIDTH && y >= 0 && y < MAP_HEIGHT) {
-    int expected = myId;
-    occupant[x][y].compare_exchange_strong(
-        expected, -1, std::memory_order_acq_rel, std::memory_order_relaxed);
   }
 }
 

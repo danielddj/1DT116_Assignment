@@ -185,7 +185,7 @@ int main(int argc, char *argv[]) {
         // If no argument is provided use the default number of threads
         std::cout << "Option --omp-regions activated\n";
       }
-      implementation_to_test = Ped::OMP;
+      implementation_to_test = Ped::OMP_REGION;
       break;
     case 'S':
       // Handle --seq

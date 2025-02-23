@@ -109,12 +109,29 @@ void Region::move_agents(Ped::Model *model, Region_handler *handler) {
                 << std::endl;
       break;
     }
-    agent->computeNextDesiredPosition();
     if (contains_desired(agent)) {
       model->move(agent);
     } else {
+      std::runtime_error("Agent should already be in correct region!");
+    }
+    curr = std::atomic_load_explicit(&curr->next, std::memory_order_acquire);
+  }
+}
+
+void Region::gather_agents(Ped::Model *model, Region_handler *handler) {
+  auto curr =
+      std::atomic_load_explicit(&agent_list_head, std::memory_order_acquire);
+  while (curr) {
+    Tagent *agent = curr->agent;
+    if (!agent) {
+      std::cerr << "[ERROR] Agent pointer is null at node " << curr.get()
+                << std::endl;
+      break;
+    }
+    agent->computeNextDesiredPosition();
+
+    if (!contains_desired(agent)) {
       transfer_agents(handler, agent);
-      model->move(agent);
     }
     curr = std::atomic_load_explicit(&curr->next, std::memory_order_acquire);
   }

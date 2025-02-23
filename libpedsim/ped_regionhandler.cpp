@@ -105,6 +105,10 @@ static Region *mergeRegions(Region *r1, Region *r2) {
 
 void Region_handler::seq_tick_regions(Ped::Model *model) {
   for (auto &region : regions) {
+    region->gather_agents(model, this);
+  }
+
+  for (auto &region : regions) {
     region->move_agents(model, this);
   }
 
@@ -208,12 +212,18 @@ void Region_handler::tick_regions(Model *model) {
   size_t threads = model->numberOfThreads;
 #pragma omp parallel num_threads(threads)
   {
-// perform the tick operation for all agents
+#pragma omp for schedule(static)
+    for (auto &region : regions) {
+      region->gather_agents(model, this);
+    }
+
 #pragma omp for schedule(static)
     for (auto &region : regions) {
       region->move_agents(model, this);
     }
   }
+
+  // perform the tick operation for all agents
 
   resize_regions();
 }

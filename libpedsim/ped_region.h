@@ -18,7 +18,7 @@ class Region_handler;
 // operations on it using the provided overloads.
 struct AgentNode {
   Tagent *agent;
-  std::shared_ptr<AgentNode> next; 
+  std::shared_ptr<AgentNode> next;
 
   AgentNode(Tagent *a);
 };
@@ -58,6 +58,7 @@ public:
   void transfer_to(Tagent *agent);
   // Process movement of agents in this region.
   void move_agents(Ped::Model *model, Region_handler *handler);
+  void gather_agents(Ped::Model *model, Region_handler *handler);
 };
 
 } // namespace Ped
