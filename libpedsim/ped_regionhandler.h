@@ -12,7 +12,7 @@ class Region_handler {
 
 public:
   Region_handler(size_t start_regions, bool resize, size_t max_x, size_t max_y,
-                 size_t max_agents, size_t min_agents,
+                 size_t max_agents, float max_load,
                  std::vector<Ped::Tagent *> agents);
   ~Region_handler();
 
@@ -24,7 +24,8 @@ public:
 
 protected:
 private:
-  size_t max_x, max_y, max_agents, min_agents;
+  size_t max_x, max_y, max_agents;
+  float max_load;
   bool dynamic_resize;
   void resize_regions();
   void valid_region_count(size_t start_regions);

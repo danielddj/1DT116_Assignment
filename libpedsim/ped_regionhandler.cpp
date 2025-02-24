@@ -5,11 +5,10 @@
 
 namespace Ped {
 Region_handler::Region_handler(size_t start_regions, bool resize, size_t max_x,
-                               size_t max_y, size_t max_agents,
-                               size_t min_agents,
+                               size_t max_y, size_t max_agents, float max_load,
                                std::vector<Ped::Tagent *> agents)
     : dynamic_resize(resize), max_x(max_x), max_y(max_y),
-      max_agents(max_agents), min_agents(min_agents) {
+      max_agents(max_agents), max_load(max_load) {
 
   valid_region_count(start_regions);
 
@@ -120,7 +119,9 @@ void Region_handler::resize_regions() {
 
   // First pass: for each region, if overcrowded, split it.
   for (auto region : regions) {
-    if (region->agentCount.load(std::memory_order_relaxed) > max_agents) {
+    if (float(region->agentCount.load(std::memory_order_relaxed)) /
+            float(max_agents) >
+        max_load) {
       std::cout << "Split!" << std::endl;
 
       // Compute midpoints.
@@ -176,10 +177,14 @@ void Region_handler::resize_regions() {
     Region *current = new_regions[i];
     // If current region is underpopulated, try to merge it with adjacent
     // underpopulated regions.
-    if (current->agentCount.load(std::memory_order_relaxed) < min_agents) {
+    if (float(current->agentCount.load(std::memory_order_acquire)) /
+            float(max_agents) <
+        max_load / 2) {
       for (size_t j = i + 1; j < new_regions.size(); j++) {
-        if (!merged[j] && new_regions[j]->agentCount.load(
-                              std::memory_order_relaxed) < min_agents) {
+        if (!merged[j] &&
+            float(current->agentCount.load(std::memory_order_acquire)) /
+                    float(max_agents) <
+                max_load / 2) {
           if (areAdjacent(current, new_regions[j])) {
             Region *mergedRegion = mergeRegions(current, new_regions[j]);
             // Mark region j as merged.
@@ -212,12 +217,12 @@ void Region_handler::tick_regions(Model *model) {
   size_t threads = model->numberOfThreads;
 #pragma omp parallel num_threads(threads)
   {
-#pragma omp for schedule(static)
+#pragma omp for schedule(dynamic)
     for (auto &region : regions) {
       region->gather_agents(model, this);
     }
 
-#pragma omp for schedule(static)
+#pragma omp for schedule(dynamic)
     for (auto &region : regions) {
       region->move_agents(model, this);
     }

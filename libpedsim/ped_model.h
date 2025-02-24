@@ -44,8 +44,8 @@ public:
   void setup(std::vector<Tagent *> agentsInScenario,
              std::vector<Twaypoint *> destinationsInScenario,
              IMPLEMENTATION implementation, size_t start_regions = 4,
-             size_t width = 160, size_t height = 120, size_t min_agents = 20,
-             size_t max_agents = 100, bool resize = true);
+             size_t width = 160, size_t height = 120, float max_load = 0.15,
+             bool resize = true);
 
   // Coordinates a time step in the scenario: move all agents by one step (if
   // applicable).
@@ -108,7 +108,7 @@ private:
 
   std::vector<float> X_WP, Y_WP, R_WP; // Waypoint Position
   void init_region(size_t start_regions, size_t width, size_t height,
-                   size_t min_agents, size_t max_agents, bool resize);
+                   float max_load, size_t max_agents, bool resize);
   Ped::Region_handler *handler;
 
   size_t tick_cuda(size_t ticks, float *d_bufferX1, float *d_bufferX2,

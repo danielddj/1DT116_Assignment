@@ -40,8 +40,8 @@ int Ped::Model::numberOfThreads =
 void Ped::Model::setup(std::vector<Ped::Tagent *> agentsInScenario,
                        std::vector<Twaypoint *> destinationsInScenario,
                        IMPLEMENTATION implementation, size_t start_regions,
-                       size_t width, size_t height, size_t min_agents,
-                       size_t max_agents, bool resize) {
+                       size_t width, size_t height, float max_load,
+                       bool resize) {
 #ifndef NOCUDA
   // Convenience test: does CUDA work on this machine?
 #else
@@ -73,7 +73,8 @@ void Ped::Model::setup(std::vector<Ped::Tagent *> agentsInScenario,
       std::runtime_error("Start_regions can not be less than 4");
     }
 
-    init_region(start_regions, width, height, min_agents, max_agents, resize);
+    init_region(start_regions, width, height, max_load, agentsInScenario.size(),
+                resize);
 
     for (int x = 0; x < MAP_WIDTH; x++) {
       for (int y = 0; y < MAP_HEIGHT; y++) {
@@ -316,10 +317,9 @@ Ped::Model::~Model() {
 }
 
 void Ped::Model::init_region(size_t start_regions, size_t width, size_t height,
-                             size_t min_agents, size_t max_agents,
-                             bool resize) {
+                             float max_load, size_t max_agents, bool resize) {
   handler = new Region_handler(start_regions, resize, width, height, max_agents,
-                               min_agents, agents);
+                               max_load, agents);
 }
 
 void Ped::Model::popluate_waypoint_vectors() {
