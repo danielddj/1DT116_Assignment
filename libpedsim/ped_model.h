@@ -35,7 +35,8 @@ enum IMPLEMENTATION {
   SEQ,
   THREADS,
   SEQ_REGION,
-  OMP_REGION
+  OMP_REGION,
+  HEAT_CUDA
 };
 
 class Model {
@@ -55,6 +56,8 @@ public:
 
   // tick for sequential implementation
   void sequential_tick();
+
+  void heat_cuda_tick();
 
   void vector_tick();
 

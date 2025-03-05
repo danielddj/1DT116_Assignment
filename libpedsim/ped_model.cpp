@@ -31,7 +31,9 @@ TAgent maybe, new class for bdry and have ptr to it in each agent?.
 
 #include <stdlib.h>
 
-namespace Ped {}
+namespace Ped
+{
+}
 
 int Ped::Model::numberOfThreads =
     omp_get_num_threads(); // by default use the number of threads available
@@ -41,7 +43,8 @@ void Ped::Model::setup(std::vector<Ped::Tagent *> agentsInScenario,
                        std::vector<Twaypoint *> destinationsInScenario,
                        IMPLEMENTATION implementation, size_t start_regions,
                        size_t width, size_t height, size_t min_agents,
-                       size_t max_agents, bool resize) {
+                       size_t max_agents, bool resize)
+{
 #ifndef NOCUDA
   // Convenience test: does CUDA work on this machine?
 #else
@@ -68,15 +71,19 @@ void Ped::Model::setup(std::vector<Ped::Tagent *> agentsInScenario,
 
   populate_agent_vectors();
 
-  if (implementation == OMP_REGION || implementation == SEQ_REGION) {
-    if (start_regions < 4) {
+  if (implementation == OMP_REGION || implementation == SEQ_REGION || HEAT_CUDA)
+  {
+    if (start_regions < 4)
+    {
       std::runtime_error("Start_regions can not be less than 4");
     }
 
     init_region(start_regions, width, height, min_agents, max_agents, resize);
 
-    for (int x = 0; x < MAP_WIDTH; x++) {
-      for (int y = 0; y < MAP_HEIGHT; y++) {
+    for (int x = 0; x < MAP_WIDTH; x++)
+    {
+      for (int y = 0; y < MAP_HEIGHT; y++)
+      {
         occupant[x][y].store(-1, std::memory_order_relaxed);
       }
     }
@@ -93,9 +100,11 @@ Implementation:
 For now, the agents are "ghosts" and cannot collide with each other.
 
 */
-void Ped::Model::tick() {
+void Ped::Model::tick()
+{
   // Choose the implementation to use
-  switch (implementation) {
+  switch (implementation)
+  {
   case SEQ:
     sequential_tick();
     break;
@@ -114,28 +123,41 @@ void Ped::Model::tick() {
   case SEQ_REGION:
     seq_region_tick();
     break;
+  case HEAT_CUDA:
+    heat_cuda_tick();
+    break;
   default:
     std::cout << "Unknown implementation." << std::endl;
     exit(1);
   }
 
-  for (int i = 0; i < agents.size(); ++i) {
+  for (int i = 0; i < agents.size(); ++i)
+  {
     // TESTING (for visualization)
     agents[i]->setX(X[i]);
     agents[i]->setY(Y[i]);
   }
 }
 
-void Ped::Model::region_tick() {
+void Ped::Model::region_tick()
+{
   // Parallelize processing over regions (using OpenMP here).
   handler->tick_regions(this);
 }
+
+void Ped::Model::heat_cuda_tick()
+{
+  handler->tick_regions(this);
+}
+
 void Ped::Model::seq_region_tick() { handler->seq_tick_regions(this); }
 
-void Ped::Model::sequential_tick() {
+void Ped::Model::sequential_tick()
+{
   int num_agents = agents.size();
 
-  for (int i = 0; i < num_agents; ++i) {
+  for (int i = 0; i < num_agents; ++i)
+  {
     // Compute the next desired position of the agent
     agents[i]->computeNextDesiredPosition();
 
@@ -145,30 +167,35 @@ void Ped::Model::sequential_tick() {
 }
 
 // The refactored vector_tick() function.
-void Ped::Model::vector_tick() {
+void Ped::Model::vector_tick()
+{
   const int num_agents = static_cast<int>(agents.size());
   int i = 0;
 
   // Process agents in SIMD blocks of 4.
-  for (; i <= num_agents - 4; i += 4) {
+  for (; i <= num_agents - 4; i += 4)
+  {
     process_agents_simd(i);
   }
 
   // Process any remaining agents using scalar code.
-  for (; i < num_agents; i++) {
+  for (; i < num_agents; i++)
+  {
     agents[i]->computeNextDesiredPosition();
     X[i] = desiredX[i];
     Y[i] = desiredY[i];
   }
 }
 
-void Ped::Model::openmp_tick2() {
+void Ped::Model::openmp_tick2()
+{
 // parallelize the outer loop for multiple ticks
 #pragma omp parallel num_threads(numberOfThreads) shared(agents)
   {
 // perform the tick operation for all agents
 #pragma omp for schedule(static)
-    for (int i = 0; i < agents.size(); i++) {
+    for (int i = 0; i < agents.size(); i++)
+    {
       agents[i]->computeNextDesiredPosition();
       X[i] = desiredX[i];
       Y[i] = desiredY[i];
@@ -176,7 +203,8 @@ void Ped::Model::openmp_tick2() {
   }
 }
 
-void Ped::Model::threads_tick() {
+void Ped::Model::threads_tick()
+{
   // store references to member vectors before launching threads
   std::vector<float> &X_ref = X;
   std::vector<float> &Y_ref = Y;
@@ -185,8 +213,10 @@ void Ped::Model::threads_tick() {
   std::vector<Ped::Tagent *> &agents_ref = agents;
 
   // Helper function to process a range of agents
-  auto processAgents = [&](int start, int end) {
-    for (int i = start; i < end; i++) {
+  auto processAgents = [&](int start, int end)
+  {
+    for (int i = start; i < end; i++)
+    {
       agents_ref[i]->computeNextDesiredPosition();
       X_ref[i] = desiredX_ref[i];
       Y_ref[i] = desiredY_ref[i];
@@ -201,21 +231,24 @@ void Ped::Model::threads_tick() {
       std::ceil(static_cast<double>(totalAgents) / numberOfThreads);
 
   // launch threads and distribute the work to them
-  for (int t = 0; t < numberOfThreads; t++) {
+  for (int t = 0; t < numberOfThreads; t++)
+  {
 
     // start and end index (of the agents) for current thread
     int start = t * agentsPerThread;
     int end = std::min(start + agentsPerThread, totalAgents);
 
     // do not launch if there is no work left ofc
-    if (start < totalAgents) {
+    if (start < totalAgents)
+    {
       std::thread thread(processAgents, start, end);
       threads.push_back(std::move(thread));
     }
   }
 
   // wait for all threads to finish
-  for (std::thread &thread : threads) {
+  for (std::thread &thread : threads)
+  {
     thread.join();
   }
 }
@@ -232,7 +265,8 @@ void Ped::Model::threads_tick() {
 // be moved to a location close to it.
 // Moves the agent to the next desired position. If already taken, it will
 // be moved to a location close to it.
-void Ped::Model::move(Ped::Tagent *agent) {
+void Ped::Model::move(Ped::Tagent *agent)
+{
   // Search for neighboring agents
   set<const Ped::Tagent *> neighbors =
       getNeighbors(X[agent->getId()], Y[agent->getId()], 2);
@@ -240,7 +274,8 @@ void Ped::Model::move(Ped::Tagent *agent) {
   // Retrieve their positions
   std::vector<std::pair<int, int>> takenPositions;
   for (std::set<const Ped::Tagent *>::iterator neighborIt = neighbors.begin();
-       neighborIt != neighbors.end(); ++neighborIt) {
+       neighborIt != neighbors.end(); ++neighborIt)
+  {
     std::pair<int, int> position(X[(*neighborIt)->getId()],
                                  Y[(*neighborIt)->getId()]);
     takenPositions.push_back(position);
@@ -256,11 +291,14 @@ void Ped::Model::move(Ped::Tagent *agent) {
   int diffX = pDesired.first - X[agent->getId()];
   int diffY = pDesired.second - Y[agent->getId()];
   std::pair<int, int> p1, p2;
-  if (diffX == 0 || diffY == 0) {
+  if (diffX == 0 || diffY == 0)
+  {
     // Agent wants to walk straight to North, South, West or East
     p1 = std::make_pair(pDesired.first + diffY, pDesired.second + diffX);
     p2 = std::make_pair(pDesired.first - diffY, pDesired.second - diffX);
-  } else {
+  }
+  else
+  {
     // Agent wants to walk diagonally
     p1 = std::make_pair(pDesired.first, Y[agent->getId()]);
     p2 = std::make_pair(X[agent->getId()], pDesired.second);
@@ -271,11 +309,13 @@ void Ped::Model::move(Ped::Tagent *agent) {
   // Find the first empty alternative position
   for (std::vector<pair<int, int>>::iterator it =
            prioritizedAlternatives.begin();
-       it != prioritizedAlternatives.end(); ++it) {
+       it != prioritizedAlternatives.end(); ++it)
+  {
 
     // If the current position is not yet taken by any neighbor
     if (std::find(takenPositions.begin(), takenPositions.end(), *it) ==
-        takenPositions.end()) {
+        takenPositions.end())
+    {
 
       // Set the agent's position
 
@@ -296,7 +336,8 @@ void Ped::Model::move(Ped::Tagent *agent) {
 /// \param   dist the distance around x/y that will be searched for agents
 /// (search field is a square in the current implementation)
 set<const Ped::Tagent *> Ped::Model::getNeighbors(int x, int y,
-                                                  int dist) const {
+                                                  int dist) const
+{
 
   // create the output list
   // ( It would be better to include only the agents close by, but this
@@ -304,34 +345,43 @@ set<const Ped::Tagent *> Ped::Model::getNeighbors(int x, int y,
   return set<const Ped::Tagent *>(agents.begin(), agents.end());
 }
 
-void Ped::Model::cleanup() {
+void Ped::Model::cleanup()
+{
   // Nothing to do here right now.
 }
 
-Ped::Model::~Model() {
+Ped::Model::~Model()
+{
   std::for_each(agents.begin(), agents.end(),
-                [](Ped::Tagent *agent) { delete agent; });
+                [](Ped::Tagent *agent)
+                { delete agent; });
   std::for_each(destinations.begin(), destinations.end(),
-                [](Ped::Twaypoint *destination) { delete destination; });
+                [](Ped::Twaypoint *destination)
+                { delete destination; });
 }
 
 void Ped::Model::init_region(size_t start_regions, size_t width, size_t height,
                              size_t min_agents, size_t max_agents,
-                             bool resize) {
+                             bool resize)
+{
   handler = new Region_handler(start_regions, resize, width, height, max_agents,
                                min_agents, agents);
 }
 
-void Ped::Model::popluate_waypoint_vectors() {
-  for (int i = 0; i < destinations.size(); ++i) {
+void Ped::Model::popluate_waypoint_vectors()
+{
+  for (int i = 0; i < destinations.size(); ++i)
+  {
     X_WP[i] = destinations[i]->getx();
     Y_WP[i] = destinations[i]->gety();
     R_WP[i] = destinations[i]->getr();
   }
 }
 
-void Ped::Model::populate_agent_vectors() {
-  for (int i = 0; i < agents.size(); ++i) {
+void Ped::Model::populate_agent_vectors()
+{
+  for (int i = 0; i < agents.size(); ++i)
+  {
     agents[i]->initialize(i, &X, &Y, &desiredX, &desiredY, &destinationX,
                           &destinationY, &destinationR);
 
@@ -346,7 +396,8 @@ void Ped::Model::populate_agent_vectors() {
   }
 }
 
-void Ped::Model::resize_vectors() {
+void Ped::Model::resize_vectors()
+{
   // Initialize global vectors
   int num_agents = agents.size();
 
@@ -367,7 +418,8 @@ void Ped::Model::resize_vectors() {
 // reached condition.
 inline __m128 Ped::Model::compute_update_mask(__m128 destX, __m128 destY,
                                               __m128 destR, __m128 posX,
-                                              __m128 posY) {
+                                              __m128 posY)
+{
   // Check for NaN in destination values.
   __m128 isNaN_X = _mm_cmpunord_ps(destX, destX);
   __m128 isNaN_Y = _mm_cmpunord_ps(destY, destY);
@@ -387,12 +439,15 @@ inline __m128 Ped::Model::compute_update_mask(__m128 destX, __m128 destY,
 }
 
 // Helper function: update agents whose mask indicates they should update.
-inline void Ped::Model::update_agents(int start_idx, __m128 update_mask) {
+inline void Ped::Model::update_agents(int start_idx, __m128 update_mask)
+{
   alignas(16) uint32_t mask_array[4];
   _mm_store_si128(reinterpret_cast<__m128i *>(mask_array),
                   _mm_castps_si128(update_mask));
-  for (int lane = 0; lane < 4; lane++) {
-    if (mask_array[lane] == 0xFFFFFFFF) {
+  for (int lane = 0; lane < 4; lane++)
+  {
+    if (mask_array[lane] == 0xFFFFFFFF)
+    {
       agents[start_idx + lane]->callNextDestination();
     }
   }
@@ -403,7 +458,8 @@ inline void Ped::Model::compute_new_desired_positions(__m128 posX, __m128 posY,
                                                       __m128 destX,
                                                       __m128 destY,
                                                       __m128 &newX,
-                                                      __m128 &newY) {
+                                                      __m128 &newY)
+{
   // Compute vector difference and its length.
   __m128 diffX = _mm_sub_ps(destX, posX);
   __m128 diffY = _mm_sub_ps(destY, posY);
@@ -430,7 +486,8 @@ inline void Ped::Model::compute_new_desired_positions(__m128 posX, __m128 posY,
 }
 
 // Helper function: process a SIMD block (4 agents) starting at index i.
-inline void Ped::Model::process_agents_simd(int i) {
+inline void Ped::Model::process_agents_simd(int i)
+{
   // Load current positions.
   __m128 posX = _mm_loadu_ps(&X[i]);
   __m128 posY = _mm_loadu_ps(&Y[i]);
