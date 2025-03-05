@@ -83,9 +83,6 @@ void Ped::Model::setupHeatmapCUDA()
 
     //  Done!
     printf("setupHeatmapCUDA() complete: host & device allocations done.\n");
-
-
-
 }   
 
 static const int BLOCK_SIZE = 16; // Example block size; tune as needed
