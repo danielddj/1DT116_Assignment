@@ -148,6 +148,7 @@ void Ped::Model::region_tick()
 {
   // Parallelize processing over regions (using OpenMP here).
   handler->tick_regions(this);
+  updateHeatmapSeq();
 }
 
 void Ped::Model::heat_cuda_tick()
