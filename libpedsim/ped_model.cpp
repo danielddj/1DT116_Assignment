@@ -148,7 +148,7 @@ void Ped::Model::region_tick()
 void Ped::Model::heat_cuda_tick()
 {
   handler->tick_regions(this);
-  //updateHeatmapCUDA();
+  updateHeatmapCUDA();
 }
 
 void Ped::Model::seq_region_tick() { handler->seq_tick_regions(this); }
