@@ -153,15 +153,14 @@ void Ped::Model::region_tick()
 
 void Ped::Model::heat_cuda_tick()
 {
+  // Firstly, launch the CUDA kernels to compute the heat map
   updateHeatmapCUDA();
 
+  // Secondly, move the agents (while the GPU is busy)
   handler->tick_regions(this);
 
-  // Wait for GPU to finish
-
+  // Wait for GPU to finish, as we need the new agents positions to calculate the heat map in the next tick
   synchronizeCUDAHeatmapCalc();
-
-
 }
 
 void Ped::Model::seq_region_tick() { handler->seq_tick_regions(this); }

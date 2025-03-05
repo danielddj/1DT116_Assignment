@@ -2,7 +2,7 @@
 
 void Ped::Model::setupHeatmapCUDA()
 {
-    /* Sequential implementation
+    /* Sequential implementation for reference
     int *hm = (int*)calloc(SIZE*SIZE, sizeof(int));
     int *shm = (int*)malloc(SCALED_SIZE*SCALED_SIZE*sizeof(int));
     int *bhm = (int*)malloc(SCALED_SIZE*SCALED_SIZE*sizeof(int));
@@ -43,10 +43,8 @@ void Ped::Model::setupHeatmapCUDA()
         exit(-1);
     }
 
-    // -----------------------------------------------------------
     // 3) Allocate device arrays for agent X,Y positions
     //    (so the GPU can do kernel_addAgents)
-    // -----------------------------------------------------------
     int n = static_cast<int>(agents.size());
     err = cudaMalloc((void **)&dev_agentX, n * sizeof(int));
     if (err != cudaSuccess)
@@ -61,17 +59,13 @@ void Ped::Model::setupHeatmapCUDA()
         exit(-1);
     }
 
-    // -----------------------------------------------------------
-    // 4) Initialize the device memory to zero (optional but clean)
-    // -----------------------------------------------------------
+    // 4) Initialize the device memory to zero
     cudaMemset(dev_heatmap, 0, SIZE * SIZE * sizeof(int));
     cudaMemset(dev_scaled_heatmap, 0, SCALED_SIZE * SCALED_SIZE * sizeof(int));
     cudaMemset(dev_blurred_heatmap, 0, SCALED_SIZE * SCALED_SIZE * sizeof(int));
 
-    // -----------------------------------------------------------
-    // 5) (Optional) Initialize agentX/agentY on the host,
+    // 5) Initialize agentX/agentY on the host,
     //    then copy to dev_agentX/dev_agentY
-    // -----------------------------------------------------------
     {
         std::vector<int> hostAx(n), hostAy(n);
         for (int i = 0; i < n; i++)
@@ -102,9 +96,7 @@ __constant__ int d_W[5][5];
 
 #define WEIGHTSUM 273
 
-//------------------------------------------------------------
 // KERNEL: Fade the heatmap by 80%
-//------------------------------------------------------------
 __global__ void kernel_fade(int *heatmap, int size)
 {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
@@ -119,10 +111,8 @@ __global__ void kernel_fade(int *heatmap, int size)
     }
 }
 
-//------------------------------------------------------------
 // KERNEL: Add agent contributions using atomicAdd
 //   agentX[i], agentY[i] are each agent's position
-//------------------------------------------------------------
 __global__ void kernel_addAgents(int *heatmap, int size,
                                  const int *agentX, const int *agentY,
                                  int numAgents)
@@ -141,9 +131,7 @@ __global__ void kernel_addAgents(int *heatmap, int size,
     }
 }
 
-//------------------------------------------------------------
 // KERNEL: Clamp values in heatmap to [0..255]
-//------------------------------------------------------------
 __global__ void kernel_clamp(int *heatmap, int size)
 {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
@@ -158,11 +146,9 @@ __global__ void kernel_clamp(int *heatmap, int size)
     }
 }
 
-//------------------------------------------------------------
 // KERNEL: Scale the heatmap into a bigger array
 //   scaled_heatmap: SCALED_SIZE x SCALED_SIZE
 //   each cell in 'heatmap' replicates into a CELLSIZE x CELLSIZE block
-//------------------------------------------------------------
 __global__ void kernel_scale(const int *heatmap, int size,
                              int *scaled_heatmap, int scaledSize,
                              int cellSize)
@@ -179,12 +165,10 @@ __global__ void kernel_scale(const int *heatmap, int size,
     }
 }
 
-//------------------------------------------------------------
 // KERNEL: 5x5 Gaussian blur using shared memory
 //   Each thread computes one pixel of blurred output.
 //   We copy the needed input region (BLOCKDIM + 4 in each dimension)
 //   to shared memory to reduce repeated reads from global memory.
-//------------------------------------------------------------
 __global__ void kernel_blur(const int *in, int *out,
                             int scaledSize)
 {
@@ -247,16 +231,12 @@ __global__ void kernel_blur(const int *in, int *out,
     }
 }
 
-//------------------------------------------------------------
-// Called from Ped::Model::updateHeatmapSeq (renamed to updateHeatmapCUDA?)
-// This function launches the kernels in the correct sequence.
-//------------------------------------------------------------
+// Calculate the heatmap on the gpu. Launches the kernels in the correct sequence.
 void Ped::Model::updateHeatmapCUDA()
 {
     int numAgents = agents.size();
     int n = static_cast<int>(agents.size());
-    // 0) [One-time setup] Make sure we have dev_heatmap, dev_scaled_heatmap, etc.
-    //    If not allocated, allocate them. Also copy the heatmap to dev_heatmap if needed.
+    // 0) Fetch agent positions from host to device
 
     std::vector<int> hostAx(n), hostAy(n);
     for (int i = 0; i < n; i++)
@@ -267,8 +247,6 @@ void Ped::Model::updateHeatmapCUDA()
     }
     cudaMemcpy(dev_agentX, hostAx.data(), n * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(dev_agentY, hostAy.data(), n * sizeof(int), cudaMemcpyHostToDevice);
-
-    // For demonstration, we assume they're already allocated and contain the old data.
 
     cudaMemcpyToSymbol(d_W, W, sizeof(W)); // Copy W to device memory
 
@@ -299,20 +277,6 @@ void Ped::Model::updateHeatmapCUDA()
 
     // 5) Blur (using shared memory)
     kernel_blur<<<gridScaled, block>>>(dev_scaled_heatmap, dev_blurred_heatmap, SCALED_SIZE);
-
-    // NOTE: All calls above are asynchronous; to truly overlap with CPU collision handling,
-    //       do not call cudaDeviceSynchronize() here. The CPU can go do collision handling
-    //       while the GPU runs these kernels.
-
-    // ... CPU does collision handling in parallel ...
-
-    // When we need the final blurred heatmap on the CPU side:
-    /*
-    cudaDeviceSynchronize(); // Wait for GPU to finish
-    cudaMemcpy(blurred_heatmap[0], dev_blurred_heatmap,
-               SCALED_SIZE * SCALED_SIZE * sizeof(int),
-               cudaMemcpyDeviceToHost);
-        */
 }
 
 void Ped::Model::synchronizeCUDAHeatmapCalc()
