@@ -121,7 +121,7 @@ void Region_handler::resize_regions() {
   // First pass: for each region, if overcrowded, split it.
   for (auto region : regions) {
     if (region->agentCount.load(std::memory_order_relaxed) > max_agents) {
-      std::cout << "Split!" << std::endl;
+      //std::cout << "Split!" << std::endl;
 
       // Compute midpoints.
       int midX = (region->xMin + region->xMax) / 2;
@@ -183,7 +183,7 @@ void Region_handler::resize_regions() {
           if (areAdjacent(current, new_regions[j])) {
             Region *mergedRegion = mergeRegions(current, new_regions[j]);
             // Mark region j as merged.
-            std::cout << "Merged!" << std::endl;
+            //std::cout << "Merged!" << std::endl;
             merged[j] = true;
             // Update current to the newly merged region.
             current = mergedRegion;

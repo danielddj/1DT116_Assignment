@@ -148,6 +148,8 @@ void Ped::Model::region_tick()
 void Ped::Model::heat_cuda_tick()
 {
   handler->tick_regions(this);
+  updateHeatmapSeq();
+
 }
 
 void Ped::Model::seq_region_tick() { handler->seq_tick_regions(this); }
@@ -321,6 +323,10 @@ void Ped::Model::move(Ped::Tagent *agent)
 
       X[agent->getId()] = (*it).first;
       Y[agent->getId()] = (*it).second;
+
+      // to retain consistency with the rest of the code ( the non vectorized version )
+      agents[agent->getId()]->setX((*it).first);
+      agents[agent->getId()]->setY((*it).second);
 
       break;
     }
