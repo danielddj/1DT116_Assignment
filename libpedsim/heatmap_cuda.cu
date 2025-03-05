@@ -1,8 +1,5 @@
 #include "heatmap_cuda.h"
-#include "ped_model.h"
-#include <iostream>
-#include <cmath>
-#include "cuda_runtime.h"
+
 
 static const int BLOCK_SIZE = 16; // Example block size; tune as needed
 static const int W[5][5] = {
