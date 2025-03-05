@@ -314,3 +314,11 @@ void Ped::Model::updateHeatmapCUDA()
                cudaMemcpyDeviceToHost);
         */
 }
+
+void Ped::Model synchronizeCUDAHeatmapCalc()
+{
+    cudaDeviceSynchronize();
+    cudaMemcpy(blurred_heatmap[0], dev_blurred_heatmap,
+               SCALED_SIZE * SCALED_SIZE * sizeof(int),
+               cudaMemcpyDeviceToHost);
+}

@@ -156,6 +156,7 @@ private:
   void updateHeatmapSeq();
   void setupHeatmapCUDA();
   void updateHeatmapCUDA();
+  void synchronizeCUDAHeatmapCalc();
   void resize_vectors();
   void populate_agent_vectors();
   void popluate_waypoint_vectors();

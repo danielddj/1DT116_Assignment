@@ -158,10 +158,10 @@ void Ped::Model::heat_cuda_tick()
   handler->tick_regions(this);
 
   // Wait for GPU to finish
-  cudaDeviceSynchronize();
-  cudaMemcpy(blurred_heatmap[0], dev_blurred_heatmap,
-             SCALED_SIZE * SCALED_SIZE * sizeof(int),
-             cudaMemcpyDeviceToHost);
+
+  synchronizeCUDAHeatmapCalc();
+
+
 }
 
 void Ped::Model::seq_region_tick() { handler->seq_tick_regions(this); }
