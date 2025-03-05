@@ -315,7 +315,7 @@ void Ped::Model::updateHeatmapCUDA()
         */
 }
 
-void Ped::Model synchronizeCUDAHeatmapCalc()
+void Ped::Mode::synchronizeCUDAHeatmapCalc()
 {
     cudaDeviceSynchronize();
     cudaMemcpy(blurred_heatmap[0], dev_blurred_heatmap,
