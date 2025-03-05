@@ -23,7 +23,68 @@ void Ped::Model::setupHeatmapCUDA()
     }
     */
 
-    
+    cudaError_t err;
+    err = cudaMalloc((void**)&dev_heatmap, SIZE * SIZE * sizeof(int));
+    if (err != cudaSuccess) {
+        fprintf(stderr, "cudaMalloc dev_heatmap failed: %s\n", cudaGetErrorString(err));
+        exit(-1);
+    }
+    err = cudaMalloc((void**)&dev_scaled_heatmap, SCALED_SIZE * SCALED_SIZE * sizeof(int));
+    if (err != cudaSuccess) {
+        fprintf(stderr, "cudaMalloc dev_scaled_heatmap failed: %s\n", cudaGetErrorString(err));
+        exit(-1);
+    }
+    err = cudaMalloc((void**)&dev_blurred_heatmap, SCALED_SIZE * SCALED_SIZE * sizeof(int));
+    if (err != cudaSuccess) {
+        fprintf(stderr, "cudaMalloc dev_blurred_heatmap failed: %s\n", cudaGetErrorString(err));
+        exit(-1);
+    }
+
+    // -----------------------------------------------------------
+    // 3) Allocate device arrays for agent X,Y positions
+    //    (so the GPU can do kernel_addAgents)
+    // -----------------------------------------------------------
+    int n = static_cast<int>(agents.size());
+    err = cudaMalloc((void**)&dev_agentX, n * sizeof(int));
+    if (err != cudaSuccess) {
+        fprintf(stderr, "cudaMalloc dev_agentX failed: %s\n", cudaGetErrorString(err));
+        exit(-1);
+    }
+    err = cudaMalloc((void**)&dev_agentY, n * sizeof(int));
+    if (err != cudaSuccess) {
+        fprintf(stderr, "cudaMalloc dev_agentY failed: %s\n", cudaGetErrorString(err));
+        exit(-1);
+    }
+
+    // -----------------------------------------------------------
+    // 4) Initialize the device memory to zero (optional but clean)
+    // -----------------------------------------------------------
+    cudaMemset(dev_heatmap,         0, SIZE * SIZE * sizeof(int));
+    cudaMemset(dev_scaled_heatmap,  0, SCALED_SIZE * SCALED_SIZE * sizeof(int));
+    cudaMemset(dev_blurred_heatmap, 0, SCALED_SIZE * SCALED_SIZE * sizeof(int));
+
+    // -----------------------------------------------------------
+    // 5) (Optional) Initialize agentX/agentY on the host,
+    //    then copy to dev_agentX/dev_agentY
+    // -----------------------------------------------------------
+    {
+        std::vector<int> hostAx(n), hostAy(n);
+        for (int i = 0; i < n; i++) {
+            // pull from your Tagent objects
+            hostAx[i] = agents[i]->getX();
+            hostAy[i] = agents[i]->getY();
+        }
+        cudaMemcpy(dev_agentX, hostAx.data(), n * sizeof(int), cudaMemcpyHostToDevice);
+        cudaMemcpy(dev_agentY, hostAy.data(), n * sizeof(int), cudaMemcpyHostToDevice);
+    }
+
+    // Flag to remember we have allocated everything
+    device_allocated = true;
+
+    //  Done!
+    printf("setupHeatmapCUDA() complete: host & device allocations done.\n");
+
+
 
 }   
 
