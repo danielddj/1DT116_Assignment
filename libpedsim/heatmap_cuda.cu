@@ -85,7 +85,7 @@ void Ped::Model::setupHeatmapCUDA()
     printf("setupHeatmapCUDA() complete: host & device allocations done.\n");
 }
 
-static const int BLOCK_SIZE = 16; // Example block size; tune as needed
+static const int BLOCK_SIZE = 16;
 static const int W[5][5] = {
     {1, 4, 7, 4, 1},
     {4, 16, 26, 16, 4},
@@ -105,14 +105,12 @@ __global__ void kernel_fade(int *heatmap, int size)
     if (x < size && y < size)
     {
         // Multiply by 0.8
-        // (rounding can be done in various ways; here we just do int-cast)
         float faded = heatmap[y * size + x] * 0.8f;
         heatmap[y * size + x] = (int)lrintf(faded); // or roundf/floorf
     }
 }
 
 // KERNEL: Add agent contributions using atomicAdd
-//   agentX[i], agentY[i] are each agent's position
 __global__ void kernel_addAgents(int *heatmap, int size,
                                  const int *agentX, const int *agentY,
                                  int numAgents)
@@ -125,7 +123,7 @@ __global__ void kernel_addAgents(int *heatmap, int size,
         // Check bounds
         if (x >= 0 && x < size && y >= 0 && y < size)
         {
-            // Data race possible here --> use atomic
+            // Data race possible here --> so we use atomic
             atomicAdd(&heatmap[y * size + x], 40);
         }
     }
@@ -166,9 +164,6 @@ __global__ void kernel_scale(const int *heatmap, int size,
 }
 
 // KERNEL: 5x5 Gaussian blur using shared memory
-//   Each thread computes one pixel of blurred output.
-//   We copy the needed input region (BLOCKDIM + 4 in each dimension)
-//   to shared memory to reduce repeated reads from global memory.
 __global__ void kernel_blur(const int *in, int *out,
                             int scaledSize)
 {
@@ -200,10 +195,6 @@ __global__ void kernel_blur(const int *in, int *out,
         tile[ly][lx] = 0; // out of bounds
     }
 
-    // Additionally, the block boundary threads need to load the halos
-    // on the left/right/top/bottom. You can do that with extra if-checks
-    // or just let the "extra threads" load them.
-    // ...
     // Use __syncthreads() to make sure the entire tile is loaded
     __syncthreads();
 
@@ -257,8 +248,7 @@ void Ped::Model::updateHeatmapCUDA()
     kernel_fade<<<grid, block>>>(dev_heatmap, SIZE);
 
     // 2) Agent additions with atomicAdd
-    //    Suppose we have agent positions in dev_agentX, dev_agentY, and the number is 'numAgents'.
-    //    We use a 1D grid for convenience:
+    //    we use a 1D grid for convenience
     int threadsPerBlock = 128;
     int blocksForAgents = (numAgents + threadsPerBlock - 1) / threadsPerBlock;
     kernel_addAgents<<<blocksForAgents, threadsPerBlock>>>(dev_heatmap, SIZE,
