@@ -247,8 +247,19 @@ __global__ void kernel_blur(const int *in, int *out,
 //------------------------------------------------------------
 void Ped::Model::updateHeatmapCUDA()
 {
+    int numAgents = agents.size();
+    int n = static_cast<int>(agents.size());
     // 0) [One-time setup] Make sure we have dev_heatmap, dev_scaled_heatmap, etc.
     //    If not allocated, allocate them. Also copy the heatmap to dev_heatmap if needed.
+
+    std::vector<int> hostAx(n), hostAy(n);
+    for (int i = 0; i < n; i++) {
+        // pull from your Tagent objects
+        hostAx[i] = agents[i]->getX();
+        hostAy[i] = agents[i]->getY();
+    }
+    cudaMemcpy(dev_agentX, hostAx.data(), n * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(dev_agentY, hostAy.data(), n * sizeof(int), cudaMemcpyHostToDevice);
 
     // For demonstration, we assume they're already allocated and contain the old data.
 
@@ -260,7 +271,6 @@ void Ped::Model::updateHeatmapCUDA()
               (SIZE + BLOCK_SIZE - 1) / BLOCK_SIZE);
     kernel_fade<<<grid, block>>>(dev_heatmap, SIZE);
 
-    int numAgents = agents.size();
 
     // 2) Agent additions with atomicAdd
     //    Suppose we have agent positions in dev_agentX, dev_agentY, and the number is 'numAgents'.
