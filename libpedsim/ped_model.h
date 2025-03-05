@@ -162,6 +162,13 @@ private:
                                             __m128 destX, __m128 destY,
                                             __m128 &newX, __m128 &newY);
   inline void process_agents_simd(int i);
+
+  int* dev_heatmap = nullptr;
+  int* dev_scaled_heatmap = nullptr;
+  int* dev_blurred_heatmap = nullptr;
+  int* dev_agentX = nullptr;
+  int* dev_agentY = nullptr;
+  bool device_allocated = false;
 };
 } // namespace Ped
 #endif
