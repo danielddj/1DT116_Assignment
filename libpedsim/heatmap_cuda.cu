@@ -24,18 +24,21 @@ void Ped::Model::setupHeatmapCUDA()
     */
 
     cudaError_t err;
-    err = cudaMalloc((void**)&dev_heatmap, SIZE * SIZE * sizeof(int));
-    if (err != cudaSuccess) {
+    err = cudaMalloc((void **)&dev_heatmap, SIZE * SIZE * sizeof(int));
+    if (err != cudaSuccess)
+    {
         fprintf(stderr, "cudaMalloc dev_heatmap failed: %s\n", cudaGetErrorString(err));
         exit(-1);
     }
-    err = cudaMalloc((void**)&dev_scaled_heatmap, SCALED_SIZE * SCALED_SIZE * sizeof(int));
-    if (err != cudaSuccess) {
+    err = cudaMalloc((void **)&dev_scaled_heatmap, SCALED_SIZE * SCALED_SIZE * sizeof(int));
+    if (err != cudaSuccess)
+    {
         fprintf(stderr, "cudaMalloc dev_scaled_heatmap failed: %s\n", cudaGetErrorString(err));
         exit(-1);
     }
-    err = cudaMalloc((void**)&dev_blurred_heatmap, SCALED_SIZE * SCALED_SIZE * sizeof(int));
-    if (err != cudaSuccess) {
+    err = cudaMalloc((void **)&dev_blurred_heatmap, SCALED_SIZE * SCALED_SIZE * sizeof(int));
+    if (err != cudaSuccess)
+    {
         fprintf(stderr, "cudaMalloc dev_blurred_heatmap failed: %s\n", cudaGetErrorString(err));
         exit(-1);
     }
@@ -45,13 +48,15 @@ void Ped::Model::setupHeatmapCUDA()
     //    (so the GPU can do kernel_addAgents)
     // -----------------------------------------------------------
     int n = static_cast<int>(agents.size());
-    err = cudaMalloc((void**)&dev_agentX, n * sizeof(int));
-    if (err != cudaSuccess) {
+    err = cudaMalloc((void **)&dev_agentX, n * sizeof(int));
+    if (err != cudaSuccess)
+    {
         fprintf(stderr, "cudaMalloc dev_agentX failed: %s\n", cudaGetErrorString(err));
         exit(-1);
     }
-    err = cudaMalloc((void**)&dev_agentY, n * sizeof(int));
-    if (err != cudaSuccess) {
+    err = cudaMalloc((void **)&dev_agentY, n * sizeof(int));
+    if (err != cudaSuccess)
+    {
         fprintf(stderr, "cudaMalloc dev_agentY failed: %s\n", cudaGetErrorString(err));
         exit(-1);
     }
@@ -59,8 +64,8 @@ void Ped::Model::setupHeatmapCUDA()
     // -----------------------------------------------------------
     // 4) Initialize the device memory to zero (optional but clean)
     // -----------------------------------------------------------
-    cudaMemset(dev_heatmap,         0, SIZE * SIZE * sizeof(int));
-    cudaMemset(dev_scaled_heatmap,  0, SCALED_SIZE * SCALED_SIZE * sizeof(int));
+    cudaMemset(dev_heatmap, 0, SIZE * SIZE * sizeof(int));
+    cudaMemset(dev_scaled_heatmap, 0, SCALED_SIZE * SCALED_SIZE * sizeof(int));
     cudaMemset(dev_blurred_heatmap, 0, SCALED_SIZE * SCALED_SIZE * sizeof(int));
 
     // -----------------------------------------------------------
@@ -69,7 +74,8 @@ void Ped::Model::setupHeatmapCUDA()
     // -----------------------------------------------------------
     {
         std::vector<int> hostAx(n), hostAy(n);
-        for (int i = 0; i < n; i++) {
+        for (int i = 0; i < n; i++)
+        {
             // pull from your Tagent objects
             hostAx[i] = agents[i]->getX();
             hostAy[i] = agents[i]->getY();
@@ -83,7 +89,7 @@ void Ped::Model::setupHeatmapCUDA()
 
     //  Done!
     printf("setupHeatmapCUDA() complete: host & device allocations done.\n");
-}   
+}
 
 static const int BLOCK_SIZE = 16; // Example block size; tune as needed
 static const int W[5][5] = {
@@ -253,7 +259,8 @@ void Ped::Model::updateHeatmapCUDA()
     //    If not allocated, allocate them. Also copy the heatmap to dev_heatmap if needed.
 
     std::vector<int> hostAx(n), hostAy(n);
-    for (int i = 0; i < n; i++) {
+    for (int i = 0; i < n; i++)
+    {
         // pull from your Tagent objects
         hostAx[i] = agents[i]->getX();
         hostAy[i] = agents[i]->getY();
@@ -270,7 +277,6 @@ void Ped::Model::updateHeatmapCUDA()
     dim3 grid((SIZE + BLOCK_SIZE - 1) / BLOCK_SIZE,
               (SIZE + BLOCK_SIZE - 1) / BLOCK_SIZE);
     kernel_fade<<<grid, block>>>(dev_heatmap, SIZE);
-
 
     // 2) Agent additions with atomicAdd
     //    Suppose we have agent positions in dev_agentX, dev_agentY, and the number is 'numAgents'.
@@ -301,8 +307,10 @@ void Ped::Model::updateHeatmapCUDA()
     // ... CPU does collision handling in parallel ...
 
     // When we need the final blurred heatmap on the CPU side:
+    /*
     cudaDeviceSynchronize(); // Wait for GPU to finish
     cudaMemcpy(blurred_heatmap[0], dev_blurred_heatmap,
                SCALED_SIZE * SCALED_SIZE * sizeof(int),
                cudaMemcpyDeviceToHost);
+        */
 }

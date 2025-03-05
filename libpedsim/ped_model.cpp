@@ -153,10 +153,15 @@ void Ped::Model::region_tick()
 
 void Ped::Model::heat_cuda_tick()
 {
+  updateHeatmapCUDA();
+
   handler->tick_regions(this);
 
-  updateHeatmapCUDA();
-  // updateHeatmapSeq();
+  // Wait for GPU to finish
+  cudaDeviceSynchronize();
+  cudaMemcpy(blurred_heatmap[0], dev_blurred_heatmap,
+             SCALED_SIZE * SCALED_SIZE * sizeof(int),
+             cudaMemcpyDeviceToHost);
 }
 
 void Ped::Model::seq_region_tick() { handler->seq_tick_regions(this); }
