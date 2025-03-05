@@ -166,6 +166,8 @@ void Ped::Model::sequential_tick()
     X[i] = agents[i]->getDesiredX();
     Y[i] = agents[i]->getDesiredY();
   }
+
+  updateHeatmapSeq();
 }
 
 // The refactored vector_tick() function.
