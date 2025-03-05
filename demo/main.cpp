@@ -91,6 +91,7 @@ int main(int argc, char *argv[]) {
         {"threads", optional_argument, NULL, 'T'},
         {"omp-regions", optional_argument, NULL, 'R'},
         {"seq-regions", optional_argument, NULL, 'S'},
+        {"heat-cuda", optional_argument, NULL, 'H'},
 
         {0, 0, 0, 0} // End of options
     };
@@ -191,6 +192,11 @@ int main(int argc, char *argv[]) {
       // Handle --seq
       std::cout << "Option --seq-regions activated\n";
       implementation_to_test = Ped::SEQ_REGION;
+      break;
+    case 'H':
+      // Handle --heat-cuda
+      std::cout << "Option --heat-cuda activated\n";
+      implementation_to_test = Ped::HEAT_CUDA;
       break;
     default:
       // Handle unknown long options
