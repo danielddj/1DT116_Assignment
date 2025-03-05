@@ -153,6 +153,10 @@ void Ped::Model::region_tick()
 void Ped::Model::heat_cuda_tick()
 {
   handler->tick_regions(this);
+
+  cudaMemcpy(dev_agentX, updatedAgentX.data(), n * sizeof(int), cudaMemcpyHostToDevice);
+  cudaMemcpy(dev_agentY, updatedAgentY.data(), n * sizeof(int), cudaMemcpyHostToDevice);
+
   updateHeatmapCUDA();
   // updateHeatmapSeq();
 }
