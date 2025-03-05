@@ -1,5 +1,31 @@
 #include "heatmap_cuda.h"
 
+void Ped::Model::setupHeatmapCUDA()
+{
+    /* Sequential implementation
+    int *hm = (int*)calloc(SIZE*SIZE, sizeof(int));
+    int *shm = (int*)malloc(SCALED_SIZE*SCALED_SIZE*sizeof(int));
+    int *bhm = (int*)malloc(SCALED_SIZE*SCALED_SIZE*sizeof(int));
+
+    heatmap = (int**)malloc(SIZE*sizeof(int*));
+
+    scaled_heatmap = (int**)malloc(SCALED_SIZE*sizeof(int*));
+    blurred_heatmap = (int**)malloc(SCALED_SIZE*sizeof(int*));
+
+    for (int i = 0; i < SIZE; i++)
+    {
+        heatmap[i] = hm + SIZE*i;
+    }
+    for (int i = 0; i < SCALED_SIZE; i++)
+    {
+        scaled_heatmap[i] = shm + SCALED_SIZE*i;
+        blurred_heatmap[i] = bhm + SCALED_SIZE*i;
+    }
+    */
+
+    
+
+}   
 
 static const int BLOCK_SIZE = 16; // Example block size; tune as needed
 static const int W[5][5] = {

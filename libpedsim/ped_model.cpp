@@ -65,6 +65,11 @@ void Ped::Model::setup(std::vector<Ped::Tagent *> agentsInScenario,
   // Set up heatmap (relevant for Assignment 4)
   setupHeatmapSeq();
 
+  if (HEAT_CUDA == implementation)
+  {
+    setupHeatmapCUDA();
+  }
+
   resize_vectors();
 
   popluate_waypoint_vectors();
@@ -149,7 +154,7 @@ void Ped::Model::heat_cuda_tick()
 {
   handler->tick_regions(this);
   updateHeatmapCUDA();
-  //updateHeatmapSeq();
+  // updateHeatmapSeq();
 }
 
 void Ped::Model::seq_region_tick() { handler->seq_tick_regions(this); }
