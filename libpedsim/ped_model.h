@@ -19,6 +19,7 @@
 
 #include "ped_agent.h"
 #include "ped_regionhandler.h"
+#include "ped_waypoint.h"
 
 namespace Ped {
 
@@ -44,7 +45,7 @@ public:
   void setup(std::vector<Tagent *> agentsInScenario,
              std::vector<Twaypoint *> destinationsInScenario,
              IMPLEMENTATION implementation, size_t start_regions = 4,
-             size_t width = 160, size_t height = 120, float max_load = 0.15,
+             size_t width = 160, size_t height = 120, float max_load = 0.175,
              bool resize = true);
 
   // Coordinates a time step in the scenario: move all agents by one step (if
@@ -61,6 +62,7 @@ public:
   // tick for openmp implementation
   void openmp_tick1();
   void openmp_tick2();
+  void updateHeatmapSeq();
 
   // tick for c++ thread implementation
   void threads_tick();
@@ -84,6 +86,7 @@ public:
   static int numberOfThreads;
   IMPLEMENTATION getImplementation() { return implementation; }
   static void warmup();
+  void updateHeatmapCUDA();
 
   // Moves an agent towards its next position
   void move(Ped::Tagent *agent);
@@ -150,7 +153,6 @@ private:
   int **blurred_heatmap;
 
   void setupHeatmapSeq();
-  void updateHeatmapSeq();
   void resize_vectors();
   void populate_agent_vectors();
   void popluate_waypoint_vectors();
@@ -162,6 +164,16 @@ private:
                                             __m128 destX, __m128 destY,
                                             __m128 &newX, __m128 &newY);
   inline void process_agents_simd(int i);
+
+  int *d_heatmap;
+  int *d_scaled;
+  int *d_blurred;
+  int *d_agentX;
+  int *d_agentY;
+  // Other members and functions.
+
+  void allocateCudaMemory();
+  void freeCudaMemory();
 };
 } // namespace Ped
 #endif

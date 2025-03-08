@@ -15,6 +15,7 @@
 #include "ExportSimulation.h"
 #include "Simulation.h"
 #include "TimingSimulation.h"
+#include <gperftools/profiler.h>
 #ifndef NOQT
 #include "MainWindow.h"
 #include "QTSimulation.h"
@@ -58,6 +59,7 @@ void print_usage(char *command) {
 }
 
 int main(int argc, char *argv[]) {
+  ProfilerStart("/tmp/cpu.profile");
   Ped::Model::warmup();
   bool timing_mode = false;
 #ifndef NOQT
@@ -176,12 +178,13 @@ int main(int argc, char *argv[]) {
       std::cout << "Option --max-steps set to: " << max_steps << std::endl;
       break;
     case 'R':
-      // Handle --omp-regions
-      if (optarg != NULL) {
+          // Handle --omp-regions
+          if (optarg != NULL) {
         // If an argument is provided set it as the number of threads
         Ped::Model::numberOfThreads = std::stoi(optarg);
         std::cout << "Option --omp-regions set to: " << optarg << std::endl;
-      } else {
+      }
+      else {
         // If no argument is provided use the default number of threads
         std::cout << "Option --omp-regions activated\n";
       }
@@ -318,5 +321,6 @@ int main(int argc, char *argv[]) {
   }
 
   cout << "Done" << endl;
+  ProfilerStop();
   return retval;
 }

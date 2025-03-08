@@ -61,6 +61,7 @@ void Ped::Model::setup(std::vector<Ped::Tagent *> agentsInScenario,
 
   // Set up heatmap (relevant for Assignment 4)
   setupHeatmapSeq();
+  allocateCudaMemory();
 
   resize_vectors();
 
@@ -130,7 +131,19 @@ void Ped::Model::tick() {
 void Ped::Model::region_tick() {
   // Parallelize processing over regions (using OpenMP here).
   handler->tick_regions(this);
+  for (auto &agent : agents) {
+    for (auto &agentInner : agents) {
+      if (agentInner->getX() == agent->getX() &&
+          agentInner->getY() == agent->getY() &&
+          !(agentInner->getId() == agent->getId()) && agentInner->getX() != 0 &&
+          agent->getY() != 0) {
+        std::cout << "Collision detected between agent " << agent->getId()
+                  << " and agent " << agentInner->getId() << std::endl;
+      }
+    }
+  }
 }
+
 void Ped::Model::seq_region_tick() { handler->seq_tick_regions(this); }
 
 void Ped::Model::sequential_tick() {
@@ -143,6 +156,7 @@ void Ped::Model::sequential_tick() {
     X[i] = agents[i]->getDesiredX();
     Y[i] = agents[i]->getDesiredY();
   }
+  updateHeatmapSeq();
 }
 
 // The refactored vector_tick() function.
@@ -171,6 +185,7 @@ void Ped::Model::openmp_tick2() {
 #pragma omp for schedule(static)
     for (int i = 0; i < agents.size(); i++) {
       agents[i]->computeNextDesiredPosition();
+
       X[i] = desiredX[i];
       Y[i] = desiredY[i];
     }

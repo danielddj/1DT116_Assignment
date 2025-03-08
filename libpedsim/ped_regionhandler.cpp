@@ -1,4 +1,5 @@
 #include "ped_regionhandler.h"
+#include "ped_model.h"
 #include "ped_region.h"
 #include <iostream>
 #include <math.h>
@@ -122,7 +123,6 @@ void Region_handler::resize_regions() {
     if (float(region->agentCount.load(std::memory_order_relaxed)) /
             float(max_agents) >
         max_load) {
-      std::cout << "Split!" << std::endl;
 
       // Compute midpoints.
       int midX = (region->xMin + region->xMax) / 2;
@@ -188,7 +188,6 @@ void Region_handler::resize_regions() {
           if (areAdjacent(current, new_regions[j])) {
             Region *mergedRegion = mergeRegions(current, new_regions[j]);
             // Mark region j as merged.
-            std::cout << "Merged!" << std::endl;
             merged[j] = true;
             // Update current to the newly merged region.
             current = mergedRegion;
@@ -217,10 +216,12 @@ void Region_handler::tick_regions(Model *model) {
   size_t threads = model->numberOfThreads;
 #pragma omp parallel num_threads(threads)
   {
-#pragma omp for schedule(dynamic)
+#pragma omp for schedule(static)
     for (auto &region : regions) {
       region->gather_agents(model, this);
     }
+
+#pragma omp barrier
 
 #pragma omp for schedule(dynamic)
     for (auto &region : regions) {
@@ -228,9 +229,7 @@ void Region_handler::tick_regions(Model *model) {
     }
   }
 
-  // perform the tick operation for all agents
-
-  resize_regions();
+  model->updateHeatmapSeq();
 }
 
 Ped::Region *Region_handler::add_region(size_t x, size_t y, size_t width,
