@@ -377,6 +377,9 @@ Ped::Model::~Model()
   std::for_each(destinations.begin(), destinations.end(),
                 [](Ped::Twaypoint *destination)
                 { delete destination; });
+
+
+  printHeatmapTimingSummary();
 }
 
 void Ped::Model::init_region(size_t start_regions, size_t width, size_t height,
