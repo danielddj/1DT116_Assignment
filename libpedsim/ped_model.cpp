@@ -536,3 +536,25 @@ inline void Ped::Model::process_agents_simd(int i)
   _mm_store_ps(&X[i], newX);
   _mm_store_ps(&Y[i], newY);
 }
+
+
+void Ped::Model::printHeatmapTimingSummary()
+{
+    if (heatmapTickCount == 0) {
+        std::cout << "No heatmap ticks performed yet.\n";
+        return;
+    }
+
+    float avgFade    = totalFadeTime      / heatmapTickCount;
+    float avgAdd     = totalAddAgentsTime / heatmapTickCount;
+    float avgClamp   = totalClampTime     / heatmapTickCount;
+    float avgScale   = totalScaleTime     / heatmapTickCount;
+    float avgBlur    = totalBlurTime      / heatmapTickCount;
+
+    std::cout << "Heatmap Timing Summary (across " << heatmapTickCount << " ticks):\n";
+    std::cout << "  Fade:      total = " << totalFadeTime      << " ms, avg = " << avgFade  << " ms\n";
+    std::cout << "  AddAgents: total = " << totalAddAgentsTime << " ms, avg = " << avgAdd   << " ms\n";
+    std::cout << "  Clamp:     total = " << totalClampTime     << " ms, avg = " << avgClamp << " ms\n";
+    std::cout << "  Scale:     total = " << totalScaleTime     << " ms, avg = " << avgScale << " ms\n";
+    std::cout << "  Blur:      total = " << totalBlurTime      << " ms, avg = " << avgBlur  << " ms\n";
+}

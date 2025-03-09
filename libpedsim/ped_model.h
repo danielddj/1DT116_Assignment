@@ -56,6 +56,7 @@ public:
 
   // tick for sequential implementation
   void sequential_tick();
+  void printHeatmapTimingSummary();
 
   void heat_cuda_tick();
 
@@ -175,6 +176,18 @@ private:
   int* dev_agentX = nullptr;
   int* dev_agentY = nullptr;
   bool device_allocated = false;
+
+float totalFadeTime = 0.0f;
+float totalAddAgentsTime = 0.0f;
+float totalClampTime = 0.0f;
+float totalScaleTime = 0.0f;
+float totalBlurTime = 0.0f;
+int   heatmapTickCount = 0;
+
+public:
+void printHeatmapTimingSummary();
+
+
 };
 } // namespace Ped
 #endif
