@@ -184,8 +184,6 @@ float totalScaleTime = 0.0f;
 float totalBlurTime = 0.0f;
 int   heatmapTickCount = 0;
 
-public:
-void printHeatmapTimingSummary();
 
 
 };
