@@ -222,7 +222,6 @@ __global__ void kernel_blur(const int *in, int *out,
     }
 }
 
-
 // KERNEL: 5x5 Gaussian blur using *global* memory (no shared memory)
 __global__ void kernel_blur_global_mem(const int *in, int *out, int scaledSize)
 {
@@ -255,7 +254,6 @@ __global__ void kernel_blur_global_mem(const int *in, int *out, int scaledSize)
     }
 }
 
-
 void Ped::Model::updateHeatmapCUDA()
 {
     int numAgents = agents.size();
@@ -283,109 +281,108 @@ void Ped::Model::updateHeatmapCUDA()
     dim3 gridScaled((SCALED_SIZE + BLOCK_SIZE - 1) / BLOCK_SIZE,
                     (SCALED_SIZE + BLOCK_SIZE - 1) / BLOCK_SIZE);
 
-
-    // We'll use these for timing each kernel
-    //cudaEvent_t startEvent, stopEvent;
-    //float elapsedMs = 0.0f;
-
-    // 1) Fade
-    //cudaEventCreate(&startEvent);
-    //cudaEventCreate(&stopEvent);
-    //cudaEventRecord(startEvent);
-
-    kernel_fade<<<grid, block>>>(dev_heatmap, SIZE);
-
-    //cudaEventRecord(stopEvent);
-    //cudaEventSynchronize(stopEvent);
-    //cudaEventElapsedTime(&elapsedMs, startEvent, stopEvent);
-    //std::cout << "Fade kernel time (ms): " << elapsedMs << std::endl;
-    // Accumulate in global variable
-    //totalFadeTime += elapsedMs;
-
-    //cudaEventDestroy(startEvent);
-    //cudaEventDestroy(stopEvent);
-
-    // 2) Agent additions with atomicAdd
-    //    we use a 1D grid for convenience
     int threadsPerBlock = 128;
     int blocksForAgents = (numAgents + threadsPerBlock - 1) / threadsPerBlock;
 
-    //cudaEventCreate(&startEvent);
-    //cudaEventCreate(&stopEvent);
-    //cudaEventRecord(startEvent);
+    // We'll use these for timing each kernel
+    // cudaEvent_t startEvent, stopEvent;
+    // float elapsedMs = 0.0f;
+
+    // 1) Fade
+    // cudaEventCreate(&startEvent);
+    // cudaEventCreate(&stopEvent);
+    // cudaEventRecord(startEvent);
+
+    kernel_fade<<<grid, block>>>(dev_heatmap, SIZE);
+
+    // cudaEventRecord(stopEvent);
+    // cudaEventSynchronize(stopEvent);
+    // cudaEventElapsedTime(&elapsedMs, startEvent, stopEvent);
+    // std::cout << "Fade kernel time (ms): " << elapsedMs << std::endl;
+    //  Accumulate in global variable
+    // totalFadeTime += elapsedMs;
+
+    // cudaEventDestroy(startEvent);
+    // cudaEventDestroy(stopEvent);
+
+    // 2) Agent additions with atomicAdd
+    //    we use a 1D grid for convenience
+
+    // cudaEventCreate(&startEvent);
+    // cudaEventCreate(&stopEvent);
+    // cudaEventRecord(startEvent);
 
     kernel_addAgents<<<blocksForAgents, threadsPerBlock>>>(dev_heatmap, SIZE,
                                                            dev_agentX, dev_agentY,
                                                            numAgents);
 
-    //cudaEventRecord(stopEvent);
-    //cudaEventSynchronize(stopEvent);
-    //cudaEventElapsedTime(&elapsedMs, startEvent, stopEvent);
-    //std::cout << "AddAgents kernel time (ms): " << elapsedMs << std::endl;
-    // Accumulate in global variable
-    //totalAddAgentsTime += elapsedMs;
+    // cudaEventRecord(stopEvent);
+    // cudaEventSynchronize(stopEvent);
+    // cudaEventElapsedTime(&elapsedMs, startEvent, stopEvent);
+    // std::cout << "AddAgents kernel time (ms): " << elapsedMs << std::endl;
+    //  Accumulate in global variable
+    // totalAddAgentsTime += elapsedMs;
 
-    //cudaEventDestroy(startEvent);
-    //cudaEventDestroy(stopEvent);
+    // cudaEventDestroy(startEvent);
+    // cudaEventDestroy(stopEvent);
 
     // 3) Clamp
-    //cudaEventCreate(&startEvent);
-    //cudaEventCreate(&stopEvent);
-    //cudaEventRecord(startEvent);
+    // cudaEventCreate(&startEvent);
+    // cudaEventCreate(&stopEvent);
+    // cudaEventRecord(startEvent);
 
     kernel_clamp<<<grid, block>>>(dev_heatmap, SIZE);
 
-    //cudaEventRecord(stopEvent);
-    //cudaEventSynchronize(stopEvent);
-    //cudaEventElapsedTime(&elapsedMs, startEvent, stopEvent);
-    // << "Clamp kernel time (ms): " << elapsedMs << std::endl;
-    // Accumulate in global variable
-    //totalClampTime += elapsedMs;
+    // cudaEventRecord(stopEvent);
+    // cudaEventSynchronize(stopEvent);
+    // cudaEventElapsedTime(&elapsedMs, startEvent, stopEvent);
+    //  << "Clamp kernel time (ms): " << elapsedMs << std::endl;
+    //  Accumulate in global variable
+    // totalClampTime += elapsedMs;
 
-    //cudaEventDestroy(startEvent);
-    //cudaEventDestroy(stopEvent);
+    // cudaEventDestroy(startEvent);
+    // cudaEventDestroy(stopEvent);
 
     // 4) Scale
-    //cudaEventCreate(&startEvent);
-    //cudaEventCreate(&stopEvent);
-    //cudaEventRecord(startEvent);
+    // cudaEventCreate(&startEvent);
+    // cudaEventCreate(&stopEvent);
+    // cudaEventRecord(startEvent);
 
     kernel_scale<<<gridScaled, block>>>(dev_heatmap, SIZE,
                                         dev_scaled_heatmap, SCALED_SIZE,
                                         CELLSIZE);
 
-    //cudaEventRecord(stopEvent);
-    //cudaEventSynchronize(stopEvent);
-    //cudaEventElapsedTime(&elapsedMs, startEvent, stopEvent);
-    //std::cout << "Scale kernel time (ms): " << elapsedMs << std::endl;
-    // Accumulate in global variable
-    //totalScaleTime += elapsedMs;
+    // cudaEventRecord(stopEvent);
+    // cudaEventSynchronize(stopEvent);
+    // cudaEventElapsedTime(&elapsedMs, startEvent, stopEvent);
+    // std::cout << "Scale kernel time (ms): " << elapsedMs << std::endl;
+    //  Accumulate in global variable
+    // totalScaleTime += elapsedMs;
 
-    //cudaEventDestroy(startEvent);
-    //cudaEventDestroy(stopEvent);
+    // cudaEventDestroy(startEvent);
+    // cudaEventDestroy(stopEvent);
 
     // 5) Blur (using shared memory)
-    //cudaEventCreate(&startEvent);
-    //cudaEventCreate(&stopEvent);
-    //cudaEventRecord(startEvent);
+    // cudaEventCreate(&startEvent);
+    // cudaEventCreate(&stopEvent);
+    // cudaEventRecord(startEvent);
 
     kernel_blur<<<gridScaled, block>>>(dev_scaled_heatmap, dev_blurred_heatmap, SCALED_SIZE);
-    //kernel_blur_global_mem<<<gridScaled, block>>>(dev_scaled_heatmap, dev_blurred_heatmap, SCALED_SIZE);
+    // kernel_blur_global_mem<<<gridScaled, block>>>(dev_scaled_heatmap, dev_blurred_heatmap, SCALED_SIZE);
 
-    //cudaEventRecord(stopEvent);
-    //cudaEventSynchronize(stopEvent);
-    //cudaEventElapsedTime(&elapsedMs, startEvent, stopEvent);
-    //std::cout << "Blur kernel time (ms): " << elapsedMs << std::endl;
-    // Accumulate in global variable
-    //totalBlurTime += elapsedMs;
+    // cudaEventRecord(stopEvent);
+    // cudaEventSynchronize(stopEvent);
+    // cudaEventElapsedTime(&elapsedMs, startEvent, stopEvent);
+    // std::cout << "Blur kernel time (ms): " << elapsedMs << std::endl;
+    //  Accumulate in global variable
+    // totalBlurTime += elapsedMs;
 
-    //cudaEventDestroy(startEvent);
-    //cudaEventDestroy(stopEvent);
+    // cudaEventDestroy(startEvent);
+    // cudaEventDestroy(stopEvent);
 
     // Count one heatmap tick
-    heatmapTickCount++;
+    //heatmapTickCount++;
 }
-
 
 void Ped::Model::synchronizeCUDAHeatmapCalc()
 {
