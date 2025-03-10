@@ -258,9 +258,6 @@ __global__ void kernel_blur_global_mem(const int *in, int *out, int scaledSize)
 
 void Ped::Model::updateHeatmapCUDA()
 {
-
-    auto start = std::chrono::high_resolution_clock::now();
-
     int numAgents = agents.size();
     int n = static_cast<int>(agents.size());
     // 0) Fetch agent positions from host to device
@@ -287,14 +284,9 @@ void Ped::Model::updateHeatmapCUDA()
                     (SCALED_SIZE + BLOCK_SIZE - 1) / BLOCK_SIZE);
 
 
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsed = end - start;
-    totalCopyTime += elapsed.count();   
-
-
     // We'll use these for timing each kernel
     //cudaEvent_t startEvent, stopEvent;
-    float elapsedMs = 0.0f;
+    //float elapsedMs = 0.0f;
 
     // 1) Fade
     //cudaEventCreate(&startEvent);
@@ -308,7 +300,7 @@ void Ped::Model::updateHeatmapCUDA()
     //cudaEventElapsedTime(&elapsedMs, startEvent, stopEvent);
     //std::cout << "Fade kernel time (ms): " << elapsedMs << std::endl;
     // Accumulate in global variable
-    totalFadeTime += elapsedMs;
+    //totalFadeTime += elapsedMs;
 
     //cudaEventDestroy(startEvent);
     //cudaEventDestroy(stopEvent);
@@ -331,7 +323,7 @@ void Ped::Model::updateHeatmapCUDA()
     //cudaEventElapsedTime(&elapsedMs, startEvent, stopEvent);
     //std::cout << "AddAgents kernel time (ms): " << elapsedMs << std::endl;
     // Accumulate in global variable
-    totalAddAgentsTime += elapsedMs;
+    //totalAddAgentsTime += elapsedMs;
 
     //cudaEventDestroy(startEvent);
     //cudaEventDestroy(stopEvent);
@@ -348,7 +340,7 @@ void Ped::Model::updateHeatmapCUDA()
     //cudaEventElapsedTime(&elapsedMs, startEvent, stopEvent);
     // << "Clamp kernel time (ms): " << elapsedMs << std::endl;
     // Accumulate in global variable
-    totalClampTime += elapsedMs;
+    //totalClampTime += elapsedMs;
 
     //cudaEventDestroy(startEvent);
     //cudaEventDestroy(stopEvent);
@@ -367,7 +359,7 @@ void Ped::Model::updateHeatmapCUDA()
     //cudaEventElapsedTime(&elapsedMs, startEvent, stopEvent);
     //std::cout << "Scale kernel time (ms): " << elapsedMs << std::endl;
     // Accumulate in global variable
-    totalScaleTime += elapsedMs;
+    //totalScaleTime += elapsedMs;
 
     //cudaEventDestroy(startEvent);
     //cudaEventDestroy(stopEvent);
@@ -385,7 +377,7 @@ void Ped::Model::updateHeatmapCUDA()
     //cudaEventElapsedTime(&elapsedMs, startEvent, stopEvent);
     //std::cout << "Blur kernel time (ms): " << elapsedMs << std::endl;
     // Accumulate in global variable
-    totalBlurTime += elapsedMs;
+    //totalBlurTime += elapsedMs;
 
     //cudaEventDestroy(startEvent);
     //cudaEventDestroy(stopEvent);
