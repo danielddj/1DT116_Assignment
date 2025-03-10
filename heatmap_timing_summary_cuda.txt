@@ -1,0 +1,6 @@
+Heatmap Timing Summary (across 170 ticks):
+  Fade:      total = 3.89273 ms, avg = 0.0228984 ms
+  AddAgents: total = 0.825632 ms, avg = 0.00485666 ms
+  Clamp:     total = 1.19264 ms, avg = 0.00701553 ms
+  Scale:     total = 26.0271 ms, avg = 0.1531 ms
+  Blur:      total = 63.4331 ms, avg = 0.373136 ms
