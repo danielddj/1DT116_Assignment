@@ -4,3 +4,4 @@
 #include <iostream>
 #include <cmath>
 #include "cuda_runtime.h"
+#include <chrono>
