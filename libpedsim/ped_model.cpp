@@ -159,7 +159,7 @@ void Ped::Model::heat_cuda_tick()
   start = std::chrono::high_resolution_clock::now();
   handler->tick_regions(this);
   end = std::chrono::high_resolution_clock::now();
-  elapsed = end - start;
+  auto elapsed = end - start;
   totalCPUTime += elapsed.count();
 
   // measure delay between cuda heatmap calculations and agent movement on the CPU
@@ -168,7 +168,7 @@ void Ped::Model::heat_cuda_tick()
   auto start = std::chrono::high_resolution_clock::now();
   updateHeatmapCUDA();
   auto end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double, std::milli> elapsed = end - start;
+  elapsed = end - start;
   launchTime += elapsed.count();
 
   // Secondly, move the agents (while the GPU is busy)
