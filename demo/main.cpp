@@ -311,6 +311,7 @@ int main(int argc, char *argv[]) {
       mainwindow.show();
       simulation.runSimulation();
       retval = app.exec();
+      model.printHeatmapTimingSummary();
 
       auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
           std::chrono::steady_clock::now() - start);
@@ -319,7 +320,6 @@ int main(int argc, char *argv[]) {
       cout << "Time: " << duration.count() << " milliseconds, " << fps
            << " Frames Per Second." << std::endl;
 
-      model.printHeatmapTimingSummary();
 
 #endif
     }
