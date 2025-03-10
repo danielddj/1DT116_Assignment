@@ -171,11 +171,11 @@ void Ped::Model::heat_cuda_tick()
 
   // Wait for GPU to finish, as we need the new agents positions to calculate the heat map in the next tick
   auto startSync = std::chrono::high_resolution_clock::now();
+  synchronizeCUDAHeatmapCalc();
   auto endSync = std::chrono::high_resolution_clock::now();
   elapsed = endSync - startSync;
   totalSyncTime += elapsed.count();
-  
-  synchronizeCUDAHeatmapCalc();
+
 
   auto endTotal = std::chrono::high_resolution_clock::now();
   totalTime += std::chrono::duration<double, std::milli>(endTotal - startTotal).count();

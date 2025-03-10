@@ -269,8 +269,7 @@ void Ped::Model::updateHeatmapCUDA()
     }
     cudaMemcpyAsync(dev_agentX, hostAx.data(), n * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpyAsync(dev_agentY, hostAy.data(), n * sizeof(int), cudaMemcpyHostToDevice);
-
-    cudaMemcpyToSymbolAsync(d_W, W, sizeof(W)); // Copy W to device memory
+    cudaMemcpyToSymbol(d_W, W, sizeof(W)); // Copy W to device memory
 
     // Set up the blocks & grids
     dim3 block(BLOCK_SIZE, BLOCK_SIZE);
@@ -387,7 +386,7 @@ void Ped::Model::updateHeatmapCUDA()
 void Ped::Model::synchronizeCUDAHeatmapCalc()
 {
     cudaDeviceSynchronize();
-    cudaMemcpyAsync(blurred_heatmap[0], dev_blurred_heatmap,
+    cudaMemcpy(blurred_heatmap[0], dev_blurred_heatmap,
                SCALED_SIZE * SCALED_SIZE * sizeof(int),
                cudaMemcpyDeviceToHost);
 }
