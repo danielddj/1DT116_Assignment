@@ -164,7 +164,7 @@ void Ped::Model::heat_cuda_tick()
 
   // Secondly, move the agents (while the GPU is busy)
   start = std::chrono::high_resolution_clock::now();
-  handler->tick_regions(this);
+  //handler->tick_regions(this);
   end = std::chrono::high_resolution_clock::now();
   elapsed = end - start;
   totalCPUTime += elapsed.count();
