@@ -185,6 +185,7 @@ float totalBlurTime = 0.0f;
 int   heatmapTickCount = 0;
 float launchTime = 0.0f;
 float totalCPUTime = 0.0f;
+float totalGPUTime  = 0.0f;
 
 
 

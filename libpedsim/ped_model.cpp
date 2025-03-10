@@ -155,6 +155,7 @@ void Ped::Model::heat_cuda_tick()
 {
   // measure delay between cuda heatmap calculations and agent movement on the CPU
   auto start = std::chrono::high_resolution_clock::now();
+  auto startTotal = std::chrono::high_resolution_clock::now();
   // Firstly, launch the CUDA kernels to compute the heat map
   
   updateHeatmapCUDA();
@@ -173,6 +174,11 @@ void Ped::Model::heat_cuda_tick()
 
   // Wait for GPU to finish, as we need the new agents positions to calculate the heat map in the next tick
   synchronizeCUDAHeatmapCalc();
+  auto endTotal = std::chrono::high_resolution_clock::now();
+  totalGPUTime += std::chrono::duration<double, std::milli>(endTotal - startTotal).count();
+
+  // Increment the number of ticks
+  heatmapTickCount++;
 }
 
 void Ped::Model::seq_region_tick() { handler->seq_tick_regions(this); }
@@ -577,6 +583,7 @@ void Ped::Model::printHeatmapTimingSummary()
     std::cout << "  Blur:      total = " << totalBlurTime      << " ms, avg = " << avgBlur  << " ms\n";
     std::cout << "  launch time: " << avgLaunch << " ms\n";
     std::cout << "  CPU time: " << avgCPUTime << " ms\n";
+    std::cout << "  GPU time: " << totalGPUTime / heatmapTickCount << " ms\n";
 
     ofstream outfile;
     outfile.open("heatmap_timing_summary.txt");
@@ -588,6 +595,7 @@ void Ped::Model::printHeatmapTimingSummary()
     outfile << "  Blur:      total = " << totalBlurTime      << " ms, avg = " << avgBlur  << " ms\n";
     outfile << "  launch time: " << avgLaunch << " ms\n";
     outfile << "  CPU time: " << avgCPUTime << " ms\n";
+    outfile << "  GPU time: " << totalGPUTime / heatmapTickCount << " ms\n";
     outfile.close();    
 
   }
