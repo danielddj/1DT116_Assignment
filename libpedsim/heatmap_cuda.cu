@@ -270,7 +270,7 @@ void Ped::Model::updateHeatmapCUDA()
     cudaMemcpyAsync(dev_agentX, hostAx.data(), n * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpyAsync(dev_agentY, hostAy.data(), n * sizeof(int), cudaMemcpyHostToDevice);
 
-    cudaMemcpyToSymbol(d_W, W, sizeof(W)); // Copy W to device memory
+    cudaMemcpyToSymbolAsync(d_W, W, sizeof(W)); // Copy W to device memory
 
     // Set up the blocks & grids
     dim3 block(BLOCK_SIZE, BLOCK_SIZE);
