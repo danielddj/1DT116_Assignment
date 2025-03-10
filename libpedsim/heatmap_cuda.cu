@@ -221,7 +221,6 @@ __global__ void kernel_blur(const int *in, int *out,
         out[gy * scaledSize + gx] = 0x00FF0000 | (value << 24);
     }
 }
-
 void Ped::Model::updateHeatmapCUDA()
 {
     int numAgents = agents.size();
@@ -264,6 +263,8 @@ void Ped::Model::updateHeatmapCUDA()
     cudaEventSynchronize(stopEvent);
     cudaEventElapsedTime(&elapsedMs, startEvent, stopEvent);
     std::cout << "Fade kernel time (ms): " << elapsedMs << std::endl;
+    // Accumulate in global variable
+    totalFadeTime += elapsedMs;
 
     cudaEventDestroy(startEvent);
     cudaEventDestroy(stopEvent);
@@ -285,6 +286,8 @@ void Ped::Model::updateHeatmapCUDA()
     cudaEventSynchronize(stopEvent);
     cudaEventElapsedTime(&elapsedMs, startEvent, stopEvent);
     std::cout << "AddAgents kernel time (ms): " << elapsedMs << std::endl;
+    // Accumulate in global variable
+    totalAddAgentsTime += elapsedMs;
 
     cudaEventDestroy(startEvent);
     cudaEventDestroy(stopEvent);
@@ -300,6 +303,8 @@ void Ped::Model::updateHeatmapCUDA()
     cudaEventSynchronize(stopEvent);
     cudaEventElapsedTime(&elapsedMs, startEvent, stopEvent);
     std::cout << "Clamp kernel time (ms): " << elapsedMs << std::endl;
+    // Accumulate in global variable
+    totalClampTime += elapsedMs;
 
     cudaEventDestroy(startEvent);
     cudaEventDestroy(stopEvent);
@@ -317,6 +322,8 @@ void Ped::Model::updateHeatmapCUDA()
     cudaEventSynchronize(stopEvent);
     cudaEventElapsedTime(&elapsedMs, startEvent, stopEvent);
     std::cout << "Scale kernel time (ms): " << elapsedMs << std::endl;
+    // Accumulate in global variable
+    totalScaleTime += elapsedMs;
 
     cudaEventDestroy(startEvent);
     cudaEventDestroy(stopEvent);
@@ -332,9 +339,14 @@ void Ped::Model::updateHeatmapCUDA()
     cudaEventSynchronize(stopEvent);
     cudaEventElapsedTime(&elapsedMs, startEvent, stopEvent);
     std::cout << "Blur kernel time (ms): " << elapsedMs << std::endl;
+    // Accumulate in global variable
+    totalBlurTime += elapsedMs;
 
     cudaEventDestroy(startEvent);
     cudaEventDestroy(stopEvent);
+
+    // Count one heatmap tick
+    heatmapTickCount++;
 }
 
 
