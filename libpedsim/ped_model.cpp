@@ -582,7 +582,7 @@ void Ped::Model::printHeatmapTimingSummary()
     std::cout << "  launch time: " << avgLaunch << " ms\n";
     std::cout << "  CPU time: " << avgCPUTime << " ms\n";
     std::cout << "  avg time: " << avgTotalTime << " ms\n";
-    std::cout <  "  avg copy time: " << totalCopyTime/heatmapTickCount  << " ms\n";
+    std::cout <<  "  avg copy time: " << totalCopyTime/heatmapTickCount  << " ms\n";
 
     ofstream outfile;
     outfile.open("heatmap_timing_summary.txt");
