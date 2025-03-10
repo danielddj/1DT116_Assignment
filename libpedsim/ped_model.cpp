@@ -155,16 +155,21 @@ void Ped::Model::heat_cuda_tick()
 {
   // measure delay between cuda heatmap calculations and agent movement on the CPU
   auto start = std::chrono::high_resolution_clock::now();
-
   // Firstly, launch the CUDA kernels to compute the heat map
+  
   updateHeatmapCUDA();
 
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> elapsed = end - start;
-  delayBetweenCUDAandCPU += elapsed.count();
+  launchTime += elapsed.count();
 
   // Secondly, move the agents (while the GPU is busy)
+  start = std::chrono::high_resolution_clock::now();
   handler->tick_regions(this);
+  end = std::chrono::high_resolution_clock::now();
+  elapsed = end - start;
+  totalCPUTime += elapsed.count();
+
 
   // Wait for GPU to finish, as we need the new agents positions to calculate the heat map in the next tick
   synchronizeCUDAHeatmapCalc();
@@ -559,6 +564,8 @@ void Ped::Model::printHeatmapTimingSummary()
     float avgClamp   = totalClampTime     / heatmapTickCount;
     float avgScale   = totalScaleTime     / heatmapTickCount;
     float avgBlur    = totalBlurTime      / heatmapTickCount;
+    float avgLaunch  = launchTime         / heatmapTickCount;
+    float avgCPUTime = totalCPUTime       / heatmapTickCount;
 
     // print to terminal
 
@@ -568,7 +575,8 @@ void Ped::Model::printHeatmapTimingSummary()
     std::cout << "  Clamp:     total = " << totalClampTime     << " ms, avg = " << avgClamp << " ms\n";
     std::cout << "  Scale:     total = " << totalScaleTime     << " ms, avg = " << avgScale << " ms\n";
     std::cout << "  Blur:      total = " << totalBlurTime      << " ms, avg = " << avgBlur  << " ms\n";
-    std::cout << "  Delay between CUDA and CPU: " << delayBetweenCUDAandCPU << " ms\n";
+    std::cout << "  launch time: " << avgLaunch << " ms\n";
+    std::cout << "  CPU time: " << avgCPUTime << " ms\n";
 
     ofstream outfile;
     outfile.open("heatmap_timing_summary.txt");
@@ -578,7 +586,8 @@ void Ped::Model::printHeatmapTimingSummary()
     outfile << "  Clamp:     total = " << totalClampTime     << " ms, avg = " << avgClamp << " ms\n";
     outfile << "  Scale:     total = " << totalScaleTime     << " ms, avg = " << avgScale << " ms\n";
     outfile << "  Blur:      total = " << totalBlurTime      << " ms, avg = " << avgBlur  << " ms\n";
-    outfile << "  Delay between CUDA and CPU: " << delayBetweenCUDAandCPU << " ms\n";
+    outfile << "  launch time: " << avgLaunch << " ms\n";
+    outfile << "  CPU time: " << avgCPUTime << " ms\n";
     outfile.close();    
 
   }
