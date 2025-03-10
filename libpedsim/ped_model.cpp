@@ -537,7 +537,9 @@ inline void Ped::Model::process_agents_simd(int i)
   _mm_store_ps(&Y[i], newY);
 }
 
-
+int Ped::Model::getHeatmapSize() const {
+	return SCALED_SIZE;
+}
 void Ped::Model::printHeatmapTimingSummary()
 {
     if (heatmapTickCount == 0) {
