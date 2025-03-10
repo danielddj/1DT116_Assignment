@@ -267,8 +267,8 @@ void Ped::Model::updateHeatmapCUDA()
         hostAx[i] = agents[i]->getX();
         hostAy[i] = agents[i]->getY();
     }
-    cudaMemcpy(dev_agentX, hostAx.data(), n * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(dev_agentY, hostAy.data(), n * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpyAsync(dev_agentX, hostAx.data(), n * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpyAsync(dev_agentY, hostAy.data(), n * sizeof(int), cudaMemcpyHostToDevice);
 
     cudaMemcpyToSymbol(d_W, W, sizeof(W)); // Copy W to device memory
 
