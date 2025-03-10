@@ -221,6 +221,41 @@ __global__ void kernel_blur(const int *in, int *out,
         out[gy * scaledSize + gx] = 0x00FF0000 | (value << 24);
     }
 }
+
+
+// KERNEL: 5x5 Gaussian blur using *global* memory (no shared memory)
+__global__ void kernel_blur_global_mem(const int *in, int *out, int scaledSize)
+{
+    // 1) Compute global coords
+    int gx = blockIdx.x * blockDim.x + threadIdx.x;
+    int gy = blockIdx.y * blockDim.y + threadIdx.y;
+
+    // 2) Check if (gx, gy) is in a valid range for a 5x5 blur
+    if (gx >= 2 && gx < (scaledSize - 2) &&
+        gy >= 2 && gy < (scaledSize - 2))
+    {
+        // 3) Perform the 5x5 weighted sum directly from global memory
+        int sum = 0;
+        for (int ky = -2; ky <= 2; ky++)
+        {
+            for (int kx = -2; kx <= 2; kx++)
+            {
+                // neighbor coordinates
+                int nx = gx + kx;
+                int ny = gy + ky;
+
+                // multiply by weight from constant memory and accumulate
+                sum += d_W[ky + 2][kx + 2] * in[ny * scaledSize + nx];
+            }
+        }
+
+        // 4) Divide by sum of weights and store as ARGB
+        int value = sum / WEIGHTSUM;
+        out[gy * scaledSize + gx] = 0x00FF0000 | (value << 24);
+    }
+}
+
+
 void Ped::Model::updateHeatmapCUDA()
 {
     int numAgents = agents.size();
@@ -333,7 +368,8 @@ void Ped::Model::updateHeatmapCUDA()
     cudaEventCreate(&stopEvent);
     cudaEventRecord(startEvent);
 
-    kernel_blur<<<gridScaled, block>>>(dev_scaled_heatmap, dev_blurred_heatmap, SCALED_SIZE);
+    //kernel_blur<<<gridScaled, block>>>(dev_scaled_heatmap, dev_blurred_heatmap, SCALED_SIZE);
+    kernel_blur_global_mem<<<gridScaled, block>>>(dev_scaled_heatmap, dev_blurred_heatmap, SCALED_SIZE);
 
     cudaEventRecord(stopEvent);
     cudaEventSynchronize(stopEvent);
