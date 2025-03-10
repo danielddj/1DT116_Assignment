@@ -153,11 +153,12 @@ void Ped::Model::region_tick()
 
 void Ped::Model::heat_cuda_tick()
 {
-  handler->tick_regions(this);
 
 
   // measure delay between cuda heatmap calculations and agent movement on the CPU
   auto startTotal = std::chrono::high_resolution_clock::now();
+  handler->tick_regions(this);
+
   // Firstly, launch the CUDA kernels to compute the heat map
   
   auto start = std::chrono::high_resolution_clock::now();
