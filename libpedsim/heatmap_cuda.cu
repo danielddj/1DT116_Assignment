@@ -258,6 +258,9 @@ __global__ void kernel_blur_global_mem(const int *in, int *out, int scaledSize)
 
 void Ped::Model::updateHeatmapCUDA()
 {
+
+    auto start = std::chrono::high_resolution_clock::now();
+
     int numAgents = agents.size();
     int n = static_cast<int>(agents.size());
     // 0) Fetch agent positions from host to device
@@ -282,6 +285,12 @@ void Ped::Model::updateHeatmapCUDA()
     // For the scaled version:
     dim3 gridScaled((SCALED_SIZE + BLOCK_SIZE - 1) / BLOCK_SIZE,
                     (SCALED_SIZE + BLOCK_SIZE - 1) / BLOCK_SIZE);
+
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    totalCopyTime += elapsed.count();   
+
 
     // We'll use these for timing each kernel
     cudaEvent_t startEvent, stopEvent;
