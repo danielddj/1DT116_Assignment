@@ -187,6 +187,7 @@ float launchTime = 0.0f;
 float totalCPUTime = 0.0f;
 float totalTime  = 0.0f;
 float totalCopyTime = 0.0f;
+float totalSyncTime = 0.0f;
 
 
 

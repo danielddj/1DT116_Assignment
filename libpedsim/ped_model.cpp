@@ -155,25 +155,26 @@ void Ped::Model::heat_cuda_tick()
 {
   auto startTotal = std::chrono::high_resolution_clock::now();
 
-  handler->tick_regions(this);
-
-
   // Firstly, launch the CUDA kernels to compute the heat map
   auto start = std::chrono::high_resolution_clock::now();
   updateHeatmapCUDA();
-
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> elapsed = end - start;
   launchTime += elapsed.count();
 
   // Secondly, move the agents (while the GPU is busy)
   start = std::chrono::high_resolution_clock::now();
+  handler->tick_regions(this);
   end = std::chrono::high_resolution_clock::now();
   elapsed = end - start;
   totalCPUTime += elapsed.count();
 
   // Wait for GPU to finish, as we need the new agents positions to calculate the heat map in the next tick
+  auto startSync = std::chrono::high_resolution_clock::now();
   synchronizeCUDAHeatmapCalc();
+  auto endSync = std::chrono::high_resolution_clock::now();
+  elapsed = endSync - startSync;
+  totalSyncTime += elapsed.count();
 
   auto endTotal = std::chrono::high_resolution_clock::now();
   totalTime += std::chrono::duration<double, std::milli>(endTotal - startTotal).count();
@@ -584,6 +585,7 @@ void Ped::Model::printHeatmapTimingSummary()
     std::cout << "  CPU time: " << avgCPUTime << " ms\n";
     std::cout << "  avg time: " << avgTotalTime << " ms\n";
     std::cout <<  "  avg copy time: " << totalCopyTime/heatmapTickCount  << " ms\n";
+    std::cout <<  "  avg sync time: " << totalSyncTime/heatmapTickCount  << " ms\n";
 
     ofstream outfile;
     outfile.open("heatmap_timing_summary.txt");
