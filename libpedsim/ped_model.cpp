@@ -153,23 +153,20 @@ void Ped::Model::region_tick()
 
 void Ped::Model::heat_cuda_tick()
 {
-
-
-  // measure delay between cuda heatmap calculations and agent movement on the CPU
   auto startTotal = std::chrono::high_resolution_clock::now();
-  handler->tick_regions(this);
 
-  // Firstly, launch the CUDA kernels to compute the heat map
   
+  // Firstly, launch the CUDA kernels to compute the heat map
   auto start = std::chrono::high_resolution_clock::now();
   updateHeatmapCUDA();
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> elapsed = end - start;
   launchTime += elapsed.count();
 
-  // Secondly, move the agents (while the GPU is busy)
 
+  // Secondly, move the agents (while the GPU is busy)
   start = std::chrono::high_resolution_clock::now();
+  handler->tick_regions(this);
   end = std::chrono::high_resolution_clock::now();
   elapsed = end - start;
   totalCPUTime += elapsed.count();
