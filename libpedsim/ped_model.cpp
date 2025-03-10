@@ -10,7 +10,7 @@
 w. static regions move to dynamic sizing. Split into multiple instances of
 TAgent maybe, new class for bdry and have ptr to it in each agent?.
 */
-
+#include <fstream>
 #include "ped_model.h"
 #include "ped_region.h"
 #include "ped_regionhandler.h"
@@ -553,10 +553,23 @@ void Ped::Model::printHeatmapTimingSummary()
     float avgScale   = totalScaleTime     / heatmapTickCount;
     float avgBlur    = totalBlurTime      / heatmapTickCount;
 
+    // print to terminal
+
     std::cout << "Heatmap Timing Summary (across " << heatmapTickCount << " ticks):\n";
     std::cout << "  Fade:      total = " << totalFadeTime      << " ms, avg = " << avgFade  << " ms\n";
     std::cout << "  AddAgents: total = " << totalAddAgentsTime << " ms, avg = " << avgAdd   << " ms\n";
     std::cout << "  Clamp:     total = " << totalClampTime     << " ms, avg = " << avgClamp << " ms\n";
     std::cout << "  Scale:     total = " << totalScaleTime     << " ms, avg = " << avgScale << " ms\n";
     std::cout << "  Blur:      total = " << totalBlurTime      << " ms, avg = " << avgBlur  << " ms\n";
-}
+    
+    ofstream outfile;
+    outfile.open("heatmap_timing_summary.txt");
+    outfile << "Heatmap Timing Summary (across " << heatmapTickCount << " ticks):\n";
+    outfile << "  Fade:      total = " << totalFadeTime      << " ms, avg = " << avgFade  << " ms\n";
+    outfile << "  AddAgents: total = " << totalAddAgentsTime << " ms, avg = " << avgAdd   << " ms\n";
+    outfile << "  Clamp:     total = " << totalClampTime     << " ms, avg = " << avgClamp << " ms\n";
+    outfile << "  Scale:     total = " << totalScaleTime     << " ms, avg = " << avgScale << " ms\n";
+    outfile << "  Blur:      total = " << totalBlurTime      << " ms, avg = " << avgBlur  << " ms\n";
+    outfile.close();    
+
+  }
