@@ -159,10 +159,10 @@ void Ped::Model::heat_cuda_tick()
   
   auto start = std::chrono::high_resolution_clock::now();
   updateHeatmapCUDA();
+  synchronizeCUDAHeatmapCalc();
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> elapsed = end - start;
   launchTime += elapsed.count();
-  synchronizeCUDAHeatmapCalc();
 
   // Secondly, move the agents (while the GPU is busy)
   start = std::chrono::high_resolution_clock::now();
