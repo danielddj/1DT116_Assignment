@@ -368,8 +368,8 @@ void Ped::Model::updateHeatmapCUDA()
     cudaEventCreate(&stopEvent);
     cudaEventRecord(startEvent);
 
-    //kernel_blur<<<gridScaled, block>>>(dev_scaled_heatmap, dev_blurred_heatmap, SCALED_SIZE);
-    kernel_blur_global_mem<<<gridScaled, block>>>(dev_scaled_heatmap, dev_blurred_heatmap, SCALED_SIZE);
+    kernel_blur<<<gridScaled, block>>>(dev_scaled_heatmap, dev_blurred_heatmap, SCALED_SIZE);
+    //kernel_blur_global_mem<<<gridScaled, block>>>(dev_scaled_heatmap, dev_blurred_heatmap, SCALED_SIZE);
 
     cudaEventRecord(stopEvent);
     cudaEventSynchronize(stopEvent);
