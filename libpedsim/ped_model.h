@@ -183,6 +183,7 @@ float totalClampTime = 0.0f;
 float totalScaleTime = 0.0f;
 float totalBlurTime = 0.0f;
 int   heatmapTickCount = 0;
+float delayBetweenCUDAandCPU = 0.0f;
 
 
 
